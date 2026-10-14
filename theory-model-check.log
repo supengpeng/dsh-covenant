@@ -1,0 +1,10 @@
+theory-model-check — architecture.md 抽象模型自检
+node v24.21.0
+  ✓ P1 能力四态与判定纪律  [definitional+teeth]  (cases=148, failed=0)
+  ✓ P2 组合图可校验性与确定性  [partial]  (cases=67834, failed=0)
+  ✓ P3 证据链篡改检测与重放  [partial]  (cases=17, failed=0)
+  ✓ P4 完整性五桶分割  [partial]  (cases=378, failed=0)
+  注: 引理 2.3（并发可交换）本身无机检；P2 只含"违反 A4 会怎样"的必要性反例。
+  注: T3 的"判定一致 ⇒ root 相等"方向依赖 A9（载荷归一化），由 P3 3d 显式演示。
+
+PASS — total cases=68377

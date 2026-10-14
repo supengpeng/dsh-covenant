@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DSH 插件测试平台 — 架构文档</title>
+<style>
+:root {
+  --bg: #f8f9fa; --fg: #1f2328; --muted:#59636e; --border:#d0d7de;
+  --code-bg:#f0f2f5; --accent:#0969da; --head-bg:#0d1117; --head-fg:#e6edf3;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#0d1117; --fg:#e6edf3; --muted:#8b949e; --border:#30363d;
+    --code-bg:#161b22; --accent:#58a6ff; --head-bg:#010409; --head-fg:#e6edf3; }
+}
+* { box-sizing: border-box; }
+html, body { margin:0; padding:0; }
+body { background:var(--bg); color:var(--fg); font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif; }
+header.mast { background:var(--head-bg); color:var(--head-fg); padding:28px 24px 22px; }
+header.mast .kicker { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+header.mast h1 { margin:6px 0 4px; font-size:22px; }
+header.mast .meta { font-size:13px; color:var(--muted); }
+header.mast a { color:var(--accent); text-decoration:none; font-weight:600; }
+main { max-width: 860px; margin: 0 auto; padding: 28px 24px 72px; }
+h1,h2,h3,h4 { line-height:1.3; margin:1.6em 0 .6em; }
+h2 { border-bottom:1px solid var(--border); padding-bottom:.3em; }
+h3,h4 { color:var(--fg); }
+a { color:var(--accent); }
+code { background:var(--code-bg); padding:.15em .4em; border-radius:5px; font:13px/1.5 ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace; }
+pre { background:var(--code-bg); border:1px solid var(--border); border-radius:8px; padding:14px 16px; overflow:auto; }
+pre code { background:none; padding:0; }
+table { border-collapse:collapse; width:100%; margin:1em 0; display:block; overflow-x:auto; }
+th, td { border:1px solid var(--border); padding:8px 12px; text-align:left; vertical-align:top; }
+th { background:var(--code-bg); font-weight:600; }
+blockquote { border-left:4px solid var(--border); margin:1em 0; padding:.2em 1em; color:var(--muted); }
+hr { border:0; border-top:1px solid var(--border); margin:2em 0; }
+ul,ol { padding-left:1.6em; }
+.mermaid-block { background:transparent; border:1px dashed var(--border); }
+.mermaid-block code.language-mermaid { white-space:pre; }
+.note { color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+<header class="mast">
+  <div class="kicker">Document</div>
+  <h1>DSH 插件测试平台 — 架构文档</h1>
+  <div class="meta">源文件：<a href="/architecture.md">architecture.md（下载）</a></div>
+</header>
+<main>
+<h1>DSH 插件测试平台 — 架构文档</h1>
+<ul>
+<li>状态：设计定稿（待评审）</li>
+<li>日期：2026-10-14</li>
+<li>范围：一个安装进 DSH（DeepSeek Harness）的「元插件」，用来验证其它 DSH 插件</li>
+<li>理论证明：<a href="theory-proof.md">theory-proof.md</a>（对本设计关键机制的形式化论证、显式假设与边界）</li>
+<li>交互图：<a href="architecture.html">architecture.html</a> · 人读渲染：<a href="architecture.doc.html">architecture.doc.html</a></li>
+</ul>
+<hr>
+<h2>1. 一句话定位</h2>
+<p>一个装进 DSH 里的 <strong>元插件</strong>，用 DSH 自己的机制去验证其它 DSH 插件——从无宿主的单元逻辑，到契约、集成、多插件冲突、端到端；从开发者本地自检，到插件市场的统一质量门禁；全程由「可信内核 + 可插拔适配器」这一架构风格贯穿。</p>
+<hr>
+<h2>2. 背景与动机</h2>
+<p>DSH 的插件生态需要一个<strong>统一的验证层</strong>。当前痛点：</p>
+<ul>
+<li>插件作者缺少一条从「纯函数能跑」到「在真实宿主里能和别人共存」的完整测试链；</li>
+<li>插件市场的准入缺少<strong>可复现、可审计、不可篡改</strong>的质量证据；</li>
+<li>没有统一的「契约真源」，插件对 DSH API 的用法只能靠人肉 review。</li>
+</ul>
+<p>本平台把这些需求收敛成一套分层、可组合、可扩展的测试能力，并用「确定性优先」保证同一个规格在任何地方跑出同一结论。</p>
+<hr>
+<h2>3. 质量属性（目标层）</h2>
+<p>这是平台要达成的<strong>目标</strong>，不是实现细节：</p>
+<table>
+<thead>
+<tr>
+<th>属性</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>准确性</strong></td>
+<td>测试结果可复现、可验证、不可篡改</td>
+</tr>
+<tr>
+<td><strong>通用性</strong></td>
+<td>支持多宿主、多版本、多插件、多环境</td>
+</tr>
+<tr>
+<td><strong>可组合</strong></td>
+<td>基础工具 → 小场景 → 大场景，层层组合</td>
+</tr>
+<tr>
+<td><strong>可扩展</strong></td>
+<td>宿主适配器、断言、能力探测器均可插拔</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>4. 设计原则（约束层）</h2>
+<p>四条目标靠下面十条<strong>纪律</strong>落地：</p>
+<table>
+<thead>
+<tr>
+<th>原则</th>
+<th>落地含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>判定精确</td>
+<td>结果用显式 <code>verdict</code> 枚举（pass / fail / skip / error / inconclusive），无隐式「通过」</td>
+</tr>
+<tr>
+<td>可信度显式</td>
+<td>每个判定绑定证据来源 + 可信级（静态源码 / mock 契约 / 真实宿主 / 重放快照）</td>
+</tr>
+<tr>
+<td>规格先行</td>
+<td>契约与场景先建模成可执行规格，断言与报告由规格生成，不从结果反推</td>
+</tr>
+<tr>
+<td>对象安全</td>
+<td>平台与测试对象零共享可变状态，只走序列化快照/消息；自制代码按不受信第三方对待</td>
+</tr>
+<tr>
+<td>线程安全</td>
+<td>异步 / worker / 并发运行安全，并发用例不污染共享状态</td>
+</tr>
+<tr>
+<td>分层职责</td>
+<td>五层各断言各的对象，不越层（契约层不碰真实宿主内部，集成层不重复单测语义）</td>
+</tr>
+<tr>
+<td>确定性优先</td>
+<td>钉死环境快照/版本矩阵/随机种子/执行顺序/调度；非确定项显式标注</td>
+</tr>
+<tr>
+<td>完整性可验证</td>
+<td>报告带「应跑清单 / 已跑清单 / 覆盖缺口」，证明无静默跳过</td>
+</tr>
+<tr>
+<td>组合可验证</td>
+<td>组合规则可静态校验；组合判定是成分判定的确定性函数</td>
+</tr>
+<tr>
+<td>最小信任</td>
+<td>不信任插件自述与宿主行为，只信外部可观察证据（能力要实测，不轻信声明）</td>
+</tr>
+</tbody></table>
+<h3>架构风格：可信内核 + 可插拔适配器</h3>
+<p>几乎每个子系统都是这个形：<strong>内核守确定性/可验证，适配器守通用性/可扩展</strong>。宿主适配器、断言、能力探测器、建议器、报告适配器、工具 SDK/协议，全部复用同一模式。</p>
+<h3>拆分纪律</h3>
+<p>模块按 <strong>职责边界 + 受信等级 + 变更频率</strong> 切，不按文件大小切；依赖只指向内核或走依赖倒置；SPI 实现不得反向依赖具体宿主或具体插件。高频替换部件（宿主适配器、断言、能力探测器）与稳定内核分开演进。</p>
+<hr>
+<h2>5. 形态与执行模型</h2>
+<h3>5.1 形态</h3>
+<ul>
+<li><strong>对外是单个插件</strong>（一个安装入口），守住「装进 DSH 的插件」这一前提。</li>
+<li><strong>对内拆成若干 Cordis 子插件 / package</strong>，每个有自己的 fiber 生命周期、独立版本、独立证据，由根插件 <code>ctx.plugin(child)</code> 组装。这正是 Cordis 的天然拆分单位，也是 DSH 自身 monorepo + bundle 的做法。</li>
+</ul>
+<h3>5.2 执行模型 A：控制面 + 隔离工作宿主</h3>
+<p>平台插件只是 <strong>控制面（orchestrator）</strong>；真正跑被测插件（PUT）的那几层，由平台通过「宿主适配器」**另起隔离的「工作宿主」**执行，而不是就地装进正在运行平台的那个 DSH。</p>
+<ul>
+<li>理由：就地加载会造成污染、无法测多版本、无法干净卸载——直接破坏「准确性」。</li>
+<li>控制面与工作宿主只通过序列化快照 / 消息传递，杜绝共享可变状态（对象安全 / 最小信任）。</li>
+</ul>
+<h3>5.3 三档隔离</h3>
+<table>
+<thead>
+<tr>
+<th>测试层</th>
+<th>隔离档</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>单元 / 契约</td>
+<td>进程内 <code>node:vm</code>（可复用现成机制）</td>
+<td>白盒、mock ctx，无需强隔离，轻快</td>
+</tr>
+<tr>
+<td>单插件集成 / 多插件冲突</td>
+<td>独立子进程 worker</td>
+<td>对象安全：崩溃/泄漏不拖垮平台，可测多版本</td>
+</tr>
+<tr>
+<td>端到端</td>
+<td>容器 / 远程</td>
+<td>最贴近真实部署</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>注：现成 <code>node:vm</code> 沙箱明确「不是安全边界」，只能做行为隔离；强隔离靠子进程/容器兜底。</p>
+</blockquote>
+<hr>
+<h2>6. 测试能力全景</h2>
+<p><strong>五层执行（由下往上，隔离度逐级降低）</strong>：</p>
+<ol>
+<li><strong>单元逻辑</strong> — 无宿主，测插件里不依赖 DSH 的纯函数 / 白盒。</li>
+<li><strong>契约</strong> — 用 mock/stub 的 DSH API，校验插件用法（参数/返回/生命周期钩子顺序）。</li>
+<li><strong>单插件集成</strong> — 真实宿主 + 隔离工作宿主，验证装配、加载、运行。</li>
+<li><strong>多插件冲突检测</strong> — 真实宿主同时加载多个插件，默认「两两组合 + 可指定集合」，检测同名命令/钩子/共享文件/共享状态冲突。</li>
+<li><strong>端到端</strong> — 真实宿主 + 真实能力，跑通完整链路。</li>
+</ol>
+<p><strong>两横切维度</strong>：</p>
+<ul>
+<li><strong>周期验证</strong>：回归 / 性能 / 安全，按调度触发。</li>
+<li><strong>通用质量手段</strong>：覆盖率 / 模糊测试 / 属性测试，作为手段套用到各层。</li>
+</ul>
+<blockquote>
+<p>覆盖率边界：行列/分支覆盖要求可插桩或源码可读；纯二进制黑盒插件只能做行为/接口覆盖。</p>
+</blockquote>
+<hr>
+<h2>7. 核心模块划分（9 个可拆分单元）</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>模块</th>
+<th>职责</th>
+<th>变更频率 / 受信</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><strong>编排内核</strong></td>
+<td>声明式组合图解析 + 执行调度（分发到宿主、收集判定）</td>
+<td>最稳</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>宿主适配器</strong> SPI + 注册表</td>
+<td>把 vm/子进程/容器抽象成统一接口</td>
+<td>高（随宿主契约变）</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>断言</strong> SPI</td>
+<td>独立「判」：observation + 期望 → verdict + 可信度 + 证据</td>
+<td>中（随判定策略变）</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>能力探测器</strong> SPI</td>
+<td>三探头（宿主/环境/插件自述）→ 能力矩阵</td>
+<td>高（随宿主+环境变）</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>工具规范</strong> + SDK/适配器</td>
+<td>manifest + 调用协议内核；SDK 主路径、协议兜底</td>
+<td>中</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>组合建议器</strong> + 人工把关</td>
+<td>产出候选组合，先规则、留 AI 插槽</td>
+<td>中（独立演进）</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>隔离工作宿主运行时</strong></td>
+<td>vm / 子进程 / 容器三档执行</td>
+<td>中</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>结果模型</strong></td>
+<td>签名 JSON 证据链 + HTML + 报告适配器</td>
+<td>中</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>对外双入口</strong></td>
+<td>本地自检 / 市场门禁</td>
+<td>低</td>
+</tr>
+</tbody></table>
+<p>依赖只指向内核或走依赖倒置；SPI 实现不反向依赖具体宿主/插件。</p>
+<hr>
+<h2>8. 三大可插拔扩展点（SPI）</h2>
+<h3>8.1 宿主适配器</h3>
+<ul>
+<li>三档：进程内 vm / 独立子进程 / 容器·远程。</li>
+<li>参考实现先做<strong>本地子进程</strong>，容器/远程作为后续适配器插到同一接口后。</li>
+<li>可复用/对齐现成 <code>cordis-host-runner</code>（<code>define / run / stop / undefine</code>、<code>node:vm</code> 沙箱、插件形态检查、<code>cordisInspect</code>）。</li>
+</ul>
+<h3>8.2 断言（独立 SPI，不是工具子类）</h3>
+<ul>
+<li>工具负责「做/观察」，产出 <strong>observation</strong>；断言负责「判断」，产出 <strong>verdict + 可信度 + 证据</strong>。</li>
+<li>做与判分离：组合图里能分清「观测节点」与「判定节点」，断言可独立插拔、独立演进。</li>
+</ul>
+<h3>8.3 能力探测器</h3>
+<ul>
+<li><strong>三探头全测</strong>：宿主能力、环境能力、插件自述能力 → 归一成一个能力矩阵。</li>
+<li>信任分级：宿主/环境 = 客观事实，探测即「已验证」；插件自述 = 声明，须<strong>实测通过</strong>才算「已验证」。</li>
+<li><strong>四态条目</strong>：<code>已探测存在 / 已探测不存在 / 不可探测 / 仅声明未验证</code>（分得清支持 / 不支持 / 没证据 / 只是嘴上说）。</li>
+<li><strong>探测时机按探头分档</strong>：宿主能力 → 缓存 + 版本指纹失效；环境能力（网络/GPU）→ 每次测；插件自述 → 跟插件版本走。</li>
+<li>能力结果本身也是不可变证据（绑探测时间 / 探测器版本 / 环境快照），历史可追溯。</li>
+<li>能力在匹配中各司其职：宿主能力 → 哪些契约/集成断言可跑；环境能力 → 能跑到什么程度；插件自述（实测后）→ 断言按能力分派。</li>
+<li><strong>能力缺失/未验证时判定打 <code>skip</code> 或 <code>inconclusive</code> 并附证据，绝不产生假 pass/fail。</strong></li>
+</ul>
+<hr>
+<h2>9. 组合子系统</h2>
+<p>三层，对应「可信内核 + 不受信建议器 + 人工把关」：</p>
+<ol>
+<li><strong>组合内核（权威层）</strong> — 声明式组合图：节点 = 基础工具（自报 I/O 类型 + 隔离档 + 确定性），边 = 依赖/类型/隔离档约束。静态可校验、无环、确定性。是「什么才叫合法组合」和「到底执行了什么」的唯一真相源。</li>
+<li><strong>建议器（候选层）</strong> — 规则引擎（先 a）产出候选组合，将来可换学习模型（留 b 插槽）。输出不受信，必须过内核静态校验 + 人工确认才铸成规格。</li>
+<li><strong>人工把关（决策层）</strong> — 采纳/拒绝/修正建议，记录作为未来「训练」原料（当前规则维护，将来可训练模型）。模型只离线更新、运行时不自动改内核。</li>
+</ol>
+<ul>
+<li><strong>组合模型可更换（版本化替换 B）</strong>：模型是版本化不可变工件，执行结果绑定「模型版本 + 工具版本 + 种子」；替换须先过内核静态校验、产出替换 diff、报告标注模型来源版本，旧版留档可回滚。schema 版本化演进走迁移规则，不为此改引擎。</li>
+<li><strong>组合必须隔离档感知</strong>：只能同档直接组合，跨档靠序列化消息桥接，禁止跨档共享可变状态。</li>
+</ul>
+<hr>
+<h2>10. 双用户 · 双入口 · 两档信任</h2>
+<p><strong>同一个测试规格，在「本地自检」和「市场门禁」两种上下文里跑出同结论</strong>；本地 <code>gate dry-run</code> 能预测门禁结果，门禁判过可本地一键复现。</p>
+<ul>
+<li><strong>本地自检</strong>：单插件为主，快反馈，人读报告友好。</li>
+<li><strong>市场门禁</strong>：批量、多插件组合、周期扫描，需不可篡改、可审计、可追责。</li>
+</ul>
+<p><strong>两档信任/发布路径</strong>：</p>
+<ul>
+<li>技术门禁（契约校验 + 首跑探测）恒在，过了即自动可用；</li>
+<li>人工门禁只在「离开本地、对外发布」时触发。</li>
+</ul>
+<hr>
+<h2>11. 结果与证据模型（三层报告）</h2>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>权威内核</strong></td>
+<td>带签名的 JSON 证据链：append-only、内容寻址、绑环境快照 + 工具/模型版本 + 种子；机器可读、可重放验证</td>
+</tr>
+<tr>
+<td><strong>本地面孔</strong></td>
+<td>可导出 HTML 人读报告</td>
+</tr>
+<tr>
+<td><strong>对外面孔</strong></td>
+<td>适配器接现成格式（JUnit / TAP 等），CI / 门禁直接消费</td>
+</tr>
+</tbody></table>
+<p>报告区分「规则校验通过」与「学习建议被采纳」，组合图记录来源（手写 / 建议器+人工确认）；复现以已确认图为准，在线建议不改变历史结果。</p>
+<hr>
+<h2>12. 核心数据流（一次运行）</h2>
+<pre class="mermaid-block"><code class="language-mermaid">sequenceDiagram
+    participant U as 用户/CI
+    participant E as 入口
+    participant K as 编排内核
+    participant CP as 能力探测器
+    participant Comb as 组合系统
+    participant W as 工作宿主
+    participant PUT as 被测插件
+    participant R as 结果模型
+
+    U-&gt;&gt;E: 运行清单(插件×版本×环境×宿主适配器)
+    E-&gt;&gt;K: 解析为执行计划
+    K-&gt;&gt;CP: 探测能力(宿主/环境/插件自述)
+    CP--&gt;&gt;K: 能力矩阵(四态)
+    K-&gt;&gt;Comb: 物化组合图(场景)
+    Comb--&gt;&gt;K: 确定性排序 + 种子
+    loop 每个场景 / 每个测试层
+        K-&gt;&gt;W: 按隔离档分发到工作宿主
+        W-&gt;&gt;PUT: 装载 / 驱动(同档内)
+        PUT--&gt;&gt;W: observation
+        K-&gt;&gt;W: 断言判定(verdict + 可信度 + 证据)
+        W--&gt;&gt;K: 判定结果
+    end
+    K-&gt;&gt;R: 沉淀证据链
+    R--&gt;&gt;U: 签名 JSON 证据链 + HTML / 报告适配
+</code></pre>
+<hr>
+<h2>13. 落地真源与技术选型</h2>
+<ul>
+<li><p><strong>技术栈</strong>：TypeScript（与 DSH 同栈）。</p>
+</li>
+<li><p><strong>DSH 插件体系 = Cordis</strong>：<code>@deepseek-ai/cordis</code> 的 Context / Fiber / Service / Events / Schema。</p>
+</li>
+<li><p><strong>契约真源</strong>：<code>docs/cordis-api/*</code> 由 <code>scripts/gen-cordis-catalog.ts</code> 从 <code>vendor/cordis/src/*.ts</code> 的 JSDoc 自动生成 → 契约层从真源自生成契约清单，不手工维护易过期契约。</p>
+</li>
+<li><p><strong>Fiber 状态机</strong>（生命周期契约）：</p>
+<pre><code>PENDING → LOADING → ACTIVE → UNLOADING → DISPOSED
+                     ↘ FAILED
+</code></pre>
+</li>
+<li><p><strong>现成可复用/对齐</strong>：</p>
+<ul>
+<li><code>cordis-host-runner</code>（<code>ctx.dynamicCordisRunner</code> / <code>ctx.cordisInspect</code>）— 宿主适配器参照；</li>
+<li><code>tool-cordis</code>（只读运行时 API 发现）— 能力探测器参照；</li>
+<li><code>ctx.tools.register(...)</code> + 工具 schema — 工具 manifest 真源参照。</li>
+</ul>
+</li>
+<li><p><strong>场景写法</strong>：声明式 DSL 为主 + 编程式兜底。</p>
+</li>
+<li><p><strong>周期调度</strong>：先 cron / 触发式简单调度器，不引入重任务队列。</p>
+</li>
+</ul>
+<hr>
+<h2>14. 扩展点与风险</h2>
+<h3>扩展点</h3>
+<ul>
+<li>三个 SPI（宿主适配器 / 断言 / 能力探测器）+ 工具规范（SDK + 协议适配器）+ 报告格式适配器 + 建议器插槽（规则 → 学习模型）。</li>
+</ul>
+<h3>主要风险 / 待核项</h3>
+<ol>
+<li><strong><code>node:vm</code> 并非安全边界</strong>：只能做行为隔离；强隔离必须上子进程/容器，且要在文档与实现中显式区分。</li>
+<li><strong>现成 <code>cordis-host-runner</code> 源码细节待核实</strong>：<code>cordisInspect</code>/<code>tool-cordis</code> 的精确契约需在实现前逐条对齐（当前设计层仅作参照，未逐行核实）。</li>
+<li><strong>能力探测失效触发器完备性</strong>：环境漂移（网络/GPU/系统库）多为无版本号因子，必须靠「环境能力每次测 + 轻量指纹」堵漏，否则缓存漏判会产生假失败。</li>
+<li><strong>学习建议器（b）的确定性张力</strong>：仅允许离线更新 + 人工评审发布，运行时绝不自动改内核。</li>
+<li><strong>性能/安全验证的可测边界</strong>：黑盒二进制插件只能做行为/接口覆盖，覆盖率口径需按层声明。</li>
+</ol>
+<hr>
+<h2>15. 决策记录（含「我的拍板」项）</h2>
+<p>以下标 ⭐ 的为作者在讨论中默认拍板、用户未否决，可改：</p>
+<table>
+<thead>
+<tr>
+<th>决策</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>形态</td>
+<td>装进 DSH 的元插件</td>
+</tr>
+<tr>
+<td>执行模型</td>
+<td>A：控制面 + 隔离工作宿主</td>
+</tr>
+<tr>
+<td>隔离分档</td>
+<td>vm / 子进程 / 容器（按测试层）</td>
+</tr>
+<tr>
+<td>拆分</td>
+<td>单插件对外，内部 9 个子插件/package</td>
+</tr>
+<tr>
+<td>断言与工具</td>
+<td>断言独立 SPI（判），工具只做/观察</td>
+</tr>
+<tr>
+<td>能力探测</td>
+<td>三探头全测、四态、分档时机</td>
+</tr>
+<tr>
+<td>组合</td>
+<td>内核 + 建议器 + 人工；模型版本化可换（B）</td>
+</tr>
+<tr>
+<td>工具规范</td>
+<td>manifest + 协议内核，SDK 主路径，适配器兜底</td>
+</tr>
+<tr>
+<td>用户</td>
+<td>本地自检 + 市场门禁，两者都要</td>
+</tr>
+<tr>
+<td>结果</td>
+<td>签名 JSON 证据链 + HTML + 报告适配器</td>
+</tr>
+<tr>
+<td>⭐ 技术栈</td>
+<td>TypeScript</td>
+</tr>
+<tr>
+<td>⭐ 场景 DSL</td>
+<td>声明式为主 + 编程式兜底</td>
+</tr>
+<tr>
+<td>⭐ 运行声明</td>
+<td>运行清单 = 矩阵（插件×版本×环境×宿主适配器）+ 场景选择</td>
+</tr>
+<tr>
+<td>⭐ 性能/安全</td>
+<td>性能=加载/启动/内存/API 往返；安全=越权访问/注入/泄密/沙箱越界</td>
+</tr>
+<tr>
+<td>⭐ 周期调度</td>
+<td>cron / 触发式简单调度器</td>
+</tr>
+<tr>
+<td>⭐ 工作宿主参考实现</td>
+<td>先本地子进程，容器/远程后续</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>附图</h2>
+<h3>图 1：架构总览（分层/组件）</h3>
+<pre class="mermaid-block"><code class="language-mermaid">flowchart TB
+    subgraph Entry[&quot;对外双入口&quot;]
+        LOCAL[&quot;本地自检&quot;]
+        GATE[&quot;市场门禁&quot;]
+    end
+
+    subgraph Control[&quot;控制面 · 元插件本体（单入口）&quot;]
+        KERNEL[&quot;编排内核&lt;br/&gt;组合图 + 调度&quot;]
+        COMB[&quot;组合子系统&lt;br/&gt;内核 + 建议器 + 人工&quot;]
+        REPORT[&quot;结果模型&lt;br/&gt;证据链 / HTML / 报告适配&quot;]
+    end
+
+    subgraph SPI[&quot;可插拔扩展点&quot;]
+        HA[&quot;宿主适配器 SPI&quot;]
+        AS[&quot;断言 SPI&quot;]
+        CP[&quot;能力探测器 SPI&quot;]
+        TOOL[&quot;工具规范&lt;br/&gt;manifest+协议 / SDK / 适配器&quot;]
+    end
+
+    subgraph WORKER[&quot;隔离工作宿主运行时&quot;]
+        VM[&quot;进程内 vm&lt;br/&gt;单元 / 契约&quot;]
+        SUB[&quot;独立子进程&lt;br/&gt;集成 / 冲突&quot;]
+        CT[&quot;容器 / 远程&lt;br/&gt;端到端&quot;]
+    end
+
+    PUT[&quot;被测插件 PUT&quot;]
+    HOST[&quot;DSH / Cordis&quot;]
+
+    LOCAL --&gt; KERNEL
+    GATE --&gt; KERNEL
+    KERNEL --&gt; COMB
+    KERNEL --&gt; SPI
+    SPI --&gt; WORKER
+    WORKER --&gt; PUT
+    PUT --&gt; HOST
+    AS &amp; CP &amp; TOOL --&gt; REPORT
+    WORKER --&gt; REPORT
+</code></pre>
+<h3>图 2：组合子系统闭环</h3>
+<pre class="mermaid-block"><code class="language-mermaid">flowchart LR
+    RULES[&quot;规则建议器&lt;br/&gt;(先 a)&quot;] --&gt;|候选| KERNEL[&quot;组合内核&lt;br/&gt;静态校验: 类型/隔离档/无环&quot;]
+    KERNEL --&gt;|校验通过| HUMAN[&quot;人工确认&quot;]
+    HUMAN --&gt;|采纳| SPEC[&quot;组合模型&lt;br/&gt;版本化不可变&quot;]
+    HUMAN --&gt;|拒绝/修正| FB[&quot;反馈记录&lt;br/&gt;(将来 b: 训练)&quot;]
+    FB -.-&gt;|离线更新| RULES
+    SPEC --&gt; EXEC[&quot;组合系统&lt;br/&gt;解释执行&quot;]
+    EXEC --&gt; EV[&quot;证据链&quot;]
+</code></pre>
+
+<p class="note">图表为 Mermaid 源码，联网时自动渲染为图形；离线时保留可复制源码。</p>
+</main>
+<script type="module">
+(async () => {
+  const blocks = [...document.querySelectorAll('pre.mermaid-block code.language-mermaid')];
+  if (!blocks.length) return;
+  try {
+    const m = await import('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs');
+    m.default.initialize({ startOnLoad:false, theme: 'default' });
+    await m.default.run({ nodes: blocks.map(b => b.parentElement) });
+  } catch (e) {
+    console.warn('mermaid render skipped (offline/blocked)', e);
+  }
+})();
+</script>
+</body>
+</html>

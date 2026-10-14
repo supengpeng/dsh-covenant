@@ -3,6 +3,8 @@
 - 状态：设计定稿（待评审）
 - 日期：2026-10-14
 - 范围：一个安装进 DSH（DeepSeek Harness）的「元插件」，用来验证其它 DSH 插件
+- 理论证明：[theory-proof.md](theory-proof.md)（对本设计关键机制的形式化论证、显式假设与边界）
+- 交互图：[architecture.html](architecture.html) · 人读渲染：[architecture.doc.html](architecture.doc.html)
 
 ---
 

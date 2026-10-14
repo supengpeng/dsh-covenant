@@ -1,0 +1,13 @@
+theory-model-check 变异测试（每个变异体都必须被检出）
+  baseline    exit=0  PASS — total cases=68377
+  detected    M1 合法谓词丢掉隔离档+类型合取 (valid := noCycle)  (exit=1: FAIL — total cases=67982)
+  detected    M2 Kahn 的 acyclic 恒为 true  (exit=1: FAIL — total cases=262961)
+  detected    M3 判定优先链把 U/D 提到 A 之前  (exit=1: FAIL — total cases=148)
+  detected    M4 canon 退回键序敏感的 JSON.stringify  (exit=1: FAIL — total cases=67999)
+  detected    M5 状态分区不交的断言改用共享存储（应被检出）  (exit=1: FAIL — total cases=67982)
+  detected    M6 能力归一让声明覆盖客观探测  (exit=1: FAIL — total cases=148)
+  detected    M7 三色 DFS 对自环视而不见  (exit=1: FAIL — total cases=67982)
+  detected    M8 节点取值丢掉入边排序（依赖入边列举顺序）  (exit=1: FAIL — total cases=67982)
+  detected    M9 完整性检测丢掉长度守卫（多出外来条目被放过）  (exit=1: FAIL — total cases=68377)
+
+ALL MUTANTS DETECTED — 机检对上述 9 个错误模型均有牙齿
