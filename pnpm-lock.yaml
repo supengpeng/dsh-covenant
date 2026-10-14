@@ -32,7 +32,14 @@ importers:
         specifier: workspace:*
         version: link:../assertion
 
-  packages/dual-entry: {}
+  packages/dual-entry:
+    dependencies:
+      '@dsh-covenant/evidence-model':
+        specifier: workspace:*
+        version: link:../evidence-model
+      '@dsh-covenant/orchestrator-core':
+        specifier: workspace:*
+        version: link:../orchestrator-core
 
   packages/evidence-model:
     dependencies:

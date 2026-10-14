@@ -19,3 +19,12 @@ export {
   type Payload,
 } from './chain.js'
 export { renderFace } from './faces.js'
+export {
+  isUnforgotten,
+  replicasEquivalent,
+  replicaOf,
+  UNFORGOTTEN_KINDS,
+  UnforgottenLedger,
+  type Replica,
+  type UnforgottenKind,
+} from './governance.js'

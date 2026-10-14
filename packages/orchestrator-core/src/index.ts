@@ -11,3 +11,4 @@ export {
   type RunResult,
   type RunSpec,
 } from './scheduler.js'
+export { issueWaiver, requireWaiverBasis, type WaiverRecord, type WaiverValidity } from './waiver.js'
