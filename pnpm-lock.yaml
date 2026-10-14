@@ -26,7 +26,11 @@ importers:
 
   packages/assertion: {}
 
-  packages/capability-probe: {}
+  packages/capability-probe:
+    dependencies:
+      '@dsh-covenant/assertion':
+        specifier: workspace:*
+        version: link:../assertion
 
   packages/dual-entry: {}
 
