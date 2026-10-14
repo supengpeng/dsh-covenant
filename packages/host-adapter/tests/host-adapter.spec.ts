@@ -5,6 +5,7 @@ import {
   ContainerHostAdapter,
   createAdapter,
   HostStateMachine,
+  RemoteHostAdapter,
   StateError,
   SubprocessHostAdapter,
   VmHostAdapter,
@@ -136,9 +137,10 @@ describe('VmHostAdapter（vm 档，A7 行为隔离）', () => {
 })
 
 describe('registry（按档分发，§5.3）', () => {
-  it('分发到正确的适配器（container 已接入寄存器）', () => {
+  it('分发到正确的适配器（四档均已接入寄存器）', () => {
     expect(createAdapter({ tier: 'vm' })).toBeInstanceOf(VmHostAdapter)
     expect(createAdapter({ tier: 'subprocess' })).toBeInstanceOf(SubprocessHostAdapter)
     expect(createAdapter({ tier: 'container' })).toBeInstanceOf(ContainerHostAdapter)
+    expect(createAdapter({ tier: 'remote' })).toBeInstanceOf(RemoteHostAdapter)
   })
 })

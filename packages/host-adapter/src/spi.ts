@@ -5,8 +5,8 @@
  * 控制面与工作宿主只经序列化消息桥（A4 零共享可变状态）。
  */
 
-/** 隔离档（architecture.md §5.3）。 */
-export type IsolationTier = 'vm' | 'subprocess' | 'container'
+/** 隔离档（architecture.md §5.3：vm / 子进程 / 容器 / 远程）。 */
+export type IsolationTier = 'vm' | 'subprocess' | 'container' | 'remote'
 
 /**
  * 工作宿主生命周期状态——镜像 cordis FiberState 语义

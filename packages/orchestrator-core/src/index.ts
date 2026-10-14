@@ -12,3 +12,14 @@ export {
   type RunSpec,
 } from './scheduler.js'
 export { issueWaiver, requireWaiverBasis, type WaiverRecord, type WaiverValidity } from './waiver.js'
+export {
+  hashSeed,
+  mulberry32,
+  perturb,
+  samplesForCycle,
+  verifyCycle,
+  type AdversarialCategory,
+  type AdversarialSample,
+  type BaseSample,
+  type CycleVerdict,
+} from './adversarial.js'

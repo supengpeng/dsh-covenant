@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:adversarial": "vitest run tests/adversarial",
+    "test:adversarial-cycle": "vitest run tests/adversarial/cycle.spec.ts",
     "test:container": "vitest run packages/host-adapter/tests/container.spec.ts",
+    "test:remote": "vitest run packages/host-adapter/tests/remote.spec.ts",
     "envelope": "node theory-envelope-check.mjs",
     "model": "node theory-model-check.mjs"
   },

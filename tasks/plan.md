@@ -5,7 +5,7 @@
 
 ## Overview
 
-把「验证其它 DSH 插件」的元插件按 `development.md` §0 的 9 模块与施工顺序实现出来；目标是让 theory-proof 的 T1–T5 结论落到可运行代码上，且每个模块有可证伪验收门。参考实现三档（`vm` / 子进程 / 容器）均已落地：子进程 + `vm` 为常规档，容器档为**真实 docker 最小雏形**（真实容器内装载/驱动/销毁/崩溃隔离，已验证）；**远端档仍为后续里程碑**。
+把「验证其它 DSH 插件」的元插件按 `development.md` §0 的 9 模块与施工顺序实现出来；目标是让 theory-proof 的 T1–T5 结论落到可运行代码上，且每个模块有可证伪验收门。参考实现四档隔离（`vm` / 子进程 / 容器 / 远端）均已落地并真实验证：vm + 子进程为常规档，容器档（真实 docker）与远端档（真实 ssh，默认 `localhost` 仅传输自测）为端到端档的最小雏形。
 
 ## Architecture Decisions
 
@@ -83,6 +83,6 @@
 ## Open Questions（不阻塞计划，M6 前需拍板）
 
 1. 是否把 `development.md` 纳入 `theory-envelope-check.mjs` 的 §引用校验。
-2. ~~容器/远端档~~ → **容器档已实现**（真实 docker 雏形，commit 见下）；**远端档仍为后续里程碑**。
-3. 对抗集新变种周期：**已收口为「后续增强 backlog」**——当前 `test:adversarial` 为固定 4 类样本 100% 检出，「周期引入新变种 + 样本来源口径」尚未实现，单列后续，不计入本次规格。
+2. ~~容器/远端档~~ → **四档隔离全部落地**：vm / 子进程 / 容器（真实 docker）/ 远端（真实 ssh）均已实现并真实验证；**无遗留后续档**（远端 `requireSecurityIsolation` 的安全隔离主张以真实独立远端主机为准，`localhost` 仅协议传输自测）。
+3. 对抗集新变种周期：已实现（`packages/orchestrator-core/src/adversarial.ts` + `tests/adversarial/cycle.spec.ts`）。**默认口径（待确认）**：周期=机检可重放（确定性 `cycle`，非时间 cron）；样本来源=内置 `builtin:v1` 基础样本 + 确定性等价变形；验收=各周期变种 100% 检出、漏检即 FAIL（F17）。
 4. 工作文件（`gen_html.mjs` / `.archify` / `.review-findings-*`）入库或 `.gitignore`。
