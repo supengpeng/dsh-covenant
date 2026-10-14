@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import path from 'node:path'
 import {
   A7_DISCLAIMER,
+  ContainerHostAdapter,
   createAdapter,
   HostStateMachine,
   StateError,
@@ -135,9 +136,9 @@ describe('VmHostAdapter（vm 档，A7 行为隔离）', () => {
 })
 
 describe('registry（按档分发，§5.3）', () => {
-  it('分发到正确的适配器；container 为后续里程碑', () => {
+  it('分发到正确的适配器（container 已接入寄存器）', () => {
     expect(createAdapter({ tier: 'vm' })).toBeInstanceOf(VmHostAdapter)
     expect(createAdapter({ tier: 'subprocess' })).toBeInstanceOf(SubprocessHostAdapter)
-    expect(() => createAdapter({ tier: 'container' })).toThrow(StateError)
+    expect(createAdapter({ tier: 'container' })).toBeInstanceOf(ContainerHostAdapter)
   })
 })

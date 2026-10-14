@@ -22,7 +22,7 @@ import {
  */
 
 // 内嵌 worker（避免依赖运行期文件路径解析；仅用单/双引号，无模板字符串）
-const WORKER_SOURCE = [
+export const WORKER_SOURCE = [
   "'use strict'",
   "const readline = require('node:readline')",
   'function mockCtx() {',
