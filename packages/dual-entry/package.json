@@ -1,0 +1,11 @@
+{
+  "name": "@dsh-covenant/dual-entry",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "对外双入口：本地自检 + 市场门禁（§5.9）",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": { ".": { "types": "./src/index.ts", "import": "./src/index.ts" } },
+  "files": ["src"]
+}

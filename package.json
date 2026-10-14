@@ -1,0 +1,22 @@
+{
+  "name": "dsh-covenant",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.28.5",
+  "description": "DSH 插件测试平台 — 验证其它 DSH 插件的元插件（见 architecture.md / theory-proof.md / development.md）",
+  "scripts": {
+    "build": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:adversarial": "vitest run tests/adversarial",
+    "envelope": "node theory-envelope-check.mjs",
+    "model": "node theory-model-check.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
