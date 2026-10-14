@@ -2,7 +2,7 @@
 
 - 状态：证明稿 · 第 5 版（已按四轮独立对抗式评审修订，修订记录见附录 C）
 - 日期：2026-10-14
-- 证明对象：[architecture.md](architecture.md) 所描述的设计模型 **M**（该文件 sha256 `66e034de834db10de23dac58d32b73aa78ed6577909c2ac392a8e63a52e5efe4`）
+- 证明对象：[architecture.md](architecture.md) 所描述的设计模型 **M**（该文件 sha256 `76440ea386733afa5a2b3b02ec411ef72c9e7c4c8355612caf13e5bcf02f53ca`）
 - 机检脚本：[theory-model-check.mjs](theory-model-check.mjs)（sha256 `8f3bca3bbf57b7fc3d06f4e91192988079e7516ca842062d29217576525d6c69`，611 行）
 - 证据日志：[theory-model-check.log](theory-model-check.log)（sha256 `cc91aabd89d48aaf2530be6c569ed6b54adb4fc71956197c894ae1dced4a6e2d`，`node v24.21.0`）
 - 形式化层级：**半形式化**——给出形式定义、引理、证明与假设边界，关键不变量由可执行模型做自洽复核与必要性反例；不构建机器可验证证明（不做 Coq/Lean 级形式化）
