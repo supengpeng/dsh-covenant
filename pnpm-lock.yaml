@@ -8,6 +8,33 @@ importers:
 
   .:
     devDependencies:
+      '@dsh-covenant/assertion':
+        specifier: workspace:*
+        version: link:packages/assertion
+      '@dsh-covenant/capability-probe':
+        specifier: workspace:*
+        version: link:packages/capability-probe
+      '@dsh-covenant/dual-entry':
+        specifier: workspace:*
+        version: link:packages/dual-entry
+      '@dsh-covenant/evidence-model':
+        specifier: workspace:*
+        version: link:packages/evidence-model
+      '@dsh-covenant/host-adapter':
+        specifier: workspace:*
+        version: link:packages/host-adapter
+      '@dsh-covenant/orchestrator-core':
+        specifier: workspace:*
+        version: link:packages/orchestrator-core
+      '@dsh-covenant/suggester-human':
+        specifier: workspace:*
+        version: link:packages/suggester-human
+      '@dsh-covenant/tool-spec':
+        specifier: workspace:*
+        version: link:packages/tool-spec
+      '@dsh-covenant/worker-host-runtime':
+        specifier: workspace:*
+        version: link:packages/worker-host-runtime
       '@types/node':
         specifier: ^22.10.2
         version: 22.20.5

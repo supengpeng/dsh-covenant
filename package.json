@@ -15,6 +15,15 @@
     "model": "node theory-model-check.mjs"
   },
   "devDependencies": {
+    "@dsh-covenant/assertion": "workspace:*",
+    "@dsh-covenant/capability-probe": "workspace:*",
+    "@dsh-covenant/dual-entry": "workspace:*",
+    "@dsh-covenant/evidence-model": "workspace:*",
+    "@dsh-covenant/host-adapter": "workspace:*",
+    "@dsh-covenant/orchestrator-core": "workspace:*",
+    "@dsh-covenant/suggester-human": "workspace:*",
+    "@dsh-covenant/tool-spec": "workspace:*",
+    "@dsh-covenant/worker-host-runtime": "workspace:*",
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
