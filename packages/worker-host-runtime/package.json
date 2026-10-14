@@ -3,9 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "三档隔离工作宿主运行时（§5.8）",
+  "description": "三档隔离工作宿主运行时：WorkerInstance + 租约（TTL 回收）+ A4 信道清单（§5.8 / §15.6）",
   "main": "src/index.ts",
   "types": "src/index.ts",
-  "exports": { ".": { "types": "./src/index.ts", "import": "./src/index.ts" } },
-  "files": ["src"]
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "files": ["src"],
+  "dependencies": {
+    "@dsh-covenant/host-adapter": "workspace:*"
+  }
 }

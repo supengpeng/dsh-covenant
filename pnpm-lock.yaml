@@ -54,11 +54,33 @@ importers:
         specifier: workspace:*
         version: link:../host-adapter
 
-  packages/suggester-human: {}
+  packages/suggester-human:
+    dependencies:
+      '@dsh-covenant/orchestrator-core':
+        specifier: workspace:*
+        version: link:../orchestrator-core
+      '@dsh-covenant/tool-spec':
+        specifier: workspace:*
+        version: link:../tool-spec
 
-  packages/tool-spec: {}
+  packages/tool-spec:
+    dependencies:
+      '@dsh-covenant/assertion':
+        specifier: workspace:*
+        version: link:../assertion
+      '@dsh-covenant/host-adapter':
+        specifier: workspace:*
+        version: link:../host-adapter
+    devDependencies:
+      '@dsh-covenant/orchestrator-core':
+        specifier: workspace:*
+        version: link:../orchestrator-core
 
-  packages/worker-host-runtime: {}
+  packages/worker-host-runtime:
+    dependencies:
+      '@dsh-covenant/host-adapter':
+        specifier: workspace:*
+        version: link:../host-adapter
 
 packages:
 
