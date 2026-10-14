@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DSH 插件测试平台 — 理论证明</title>
+<style>
+:root {
+  --bg: #f8f9fa; --fg: #1f2328; --muted:#59636e; --border:#d0d7de;
+  --code-bg:#f0f2f5; --accent:#0969da; --head-bg:#0d1117; --head-fg:#e6edf3;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#0d1117; --fg:#e6edf3; --muted:#8b949e; --border:#30363d;
+    --code-bg:#161b22; --accent:#58a6ff; --head-bg:#010409; --head-fg:#e6edf3; }
+}
+* { box-sizing: border-box; }
+html, body { margin:0; padding:0; }
+body { background:var(--bg); color:var(--fg); font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif; }
+header.mast { background:var(--head-bg); color:var(--head-fg); padding:28px 24px 22px; }
+header.mast .kicker { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+header.mast h1 { margin:6px 0 4px; font-size:22px; }
+header.mast .meta { font-size:13px; color:var(--muted); }
+header.mast a { color:var(--accent); text-decoration:none; font-weight:600; }
+main { max-width: 860px; margin: 0 auto; padding: 28px 24px 72px; }
+h1,h2,h3,h4 { line-height:1.3; margin:1.6em 0 .6em; }
+h2 { border-bottom:1px solid var(--border); padding-bottom:.3em; }
+h3,h4 { color:var(--fg); }
+a { color:var(--accent); }
+code { background:var(--code-bg); padding:.15em .4em; border-radius:5px; font:13px/1.5 ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace; }
+pre { background:var(--code-bg); border:1px solid var(--border); border-radius:8px; padding:14px 16px; overflow:auto; }
+pre code { background:none; padding:0; }
+table { border-collapse:collapse; width:100%; margin:1em 0; display:block; overflow-x:auto; }
+th, td { border:1px solid var(--border); padding:8px 12px; text-align:left; vertical-align:top; }
+th { background:var(--code-bg); font-weight:600; }
+blockquote { border-left:4px solid var(--border); margin:1em 0; padding:.2em 1em; color:var(--muted); }
+hr { border:0; border-top:1px solid var(--border); margin:2em 0; }
+ul,ol { padding-left:1.6em; }
+.mermaid-block { background:transparent; border:1px dashed var(--border); }
+.mermaid-block code.language-mermaid { white-space:pre; }
+.note { color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+<header class="mast">
+  <div class="kicker">Document</div>
+  <h1>DSH 插件测试平台 — 理论证明</h1>
+  <div class="meta">源文件：<a href="/theory-proof.md">theory-proof.md（下载）</a></div>
+</header>
+<main>
+<h1>DSH 插件测试平台 — 理论证明</h1>
+<ul>
+<li>状态：证明稿 · 第 5 版（已按四轮独立对抗式评审修订，修订记录见附录 C）</li>
+<li>日期：2026-10-14</li>
+<li>证明对象：<a href="architecture.md">architecture.md</a> 所描述的设计模型 <strong>M</strong>（该文件 sha256 <code>5c658a36595bd19206ae115ccd92ffc174fb4b2f702565625ec3cfa61ebd8dea</code>）</li>
+<li>机检脚本：<a href="theory-model-check.mjs">theory-model-check.mjs</a>（sha256 <code>8f3bca3bbf57b7fc3d06f4e91192988079e7516ca842062d29217576525d6c69</code>，611 行）</li>
+<li>证据日志：<a href="theory-model-check.log">theory-model-check.log</a>（sha256 <code>cc91aabd89d48aaf2530be6c569ed6b54adb4fc71956197c894ae1dced4a6e2d</code>，<code>node v24.21.0</code>）</li>
+<li>信封校验：<a href="theory-envelope-check.mjs">theory-envelope-check.mjs</a>（复现：<code>node theory-envelope-check.mjs</code>，机械断言文件哈希/版本信封/§引用一致）</li>
+<li>形式化层级：<strong>半形式化</strong>——给出形式定义、引理、证明与假设边界，关键不变量由可执行模型做自洽复核与必要性反例；不构建机器可验证证明（不做 Coq/Lean 级形式化）</li>
+</ul>
+<hr>
+<h2>0. 定位、非目标与证明强度</h2>
+<p>本文对 M 的<strong>关键机制</strong>做演绎论证，而不是复述 §3/§4 的每一条质量属性。</p>
+<p><strong>证明的是</strong>：在显式假设 A0–A10 下，五个机制性命题成立（能力探测无假判定、组合图判定确定性、证据链可检篡改且在 A9 下可重放、双入口同结论、报告无静默跳过）。</p>
+<p><strong>证明的不是</strong>：</p>
+<ol>
+<li><strong>实现性质</strong>——M 尚无实现。结论属于设计模型；实现要继承结论须先满足符合性义务（A0）。</li>
+<li><strong>无条件成立性</strong>——每条定理绑定假设与边界（第 4 节）；依赖未证假设的结论标注为<strong>条件性成立</strong>。</li>
+<li><strong>安全性、性能、通用性、可扩展性</strong>——非目标（§3 的另三条质量属性留作后续）。</li>
+</ol>
+<h3>0.1 证明强度标注（第 2 版收紧）</h3>
+<table>
+<thead>
+<tr>
+<th>标记</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内证</td>
+<td>在列出的假设内、由定义演绎成立</td>
+</tr>
+<tr>
+<td>双实现复核</td>
+<td>该命题的<strong>对应不变量</strong>由两个独立实现交叉验证通过（机检中可以失败）</td>
+</tr>
+<tr>
+<td>有齿</td>
+<td>机检含&quot;错误模型必须被检出&quot;的反证；无此反证的检查只能算定义自洽复核</td>
+</tr>
+<tr>
+<td>条件性</td>
+<td>结论依赖某个目前未证/未核实的假设</td>
+</tr>
+<tr>
+<td>无机检</td>
+<td>该命题没有被机检覆盖（无实现可测），只有内证</td>
+</tr>
+</tbody></table>
+<p><strong>关键澄清</strong>：机检脚本不读取 <a href="architecture.md">architecture.md</a> 文本、也不是 M 的实现。它的价值是①发现形式定义内部矛盾，②用&quot;错误模型必须被检出&quot;的反证给定义检查装上牙齿。<strong>它给不出独立 oracle</strong>；对 T1/T3/T5 这类本质上是&quot;定义即结论&quot;的命题，机检只能证明定义自洽，不能证明定义正确。</p>
+<hr>
+<h2>1. 形式化基础</h2>
+<h3>1.1 记号与引用约定</h3>
+<p><strong>引用约定</strong>（对 <a href="architecture.md">architecture.md</a>）：</p>
+<ul>
+<li><code>§n</code> 指该文档第 n 节；<code>§n.m</code> 指 §n 内第 m 个编号条目/子节（如 §8.3 = 「能力探测器」、§9.1 = 组合子系统三层中的「组合内核」）。</li>
+<li><code>§9 末</code> = §9 末尾两条独立约束：版本化替换 B、隔离档感知。</li>
+<li><code>§11 末</code> = §11 最后一段：报告区分规则校验与建议采纳；复现以已确认图为准，在线建议不改变历史结果。</li>
+<li><code>§14 x</code> = §14「主要风险 / 待核项」第 x 条风险项。</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>记号</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>$S = {P, A, U, D}$</td>
+<td>能力条目四态：$P$ 已探测存在、$A$ 已探测不存在、$U$ 不可探测、$D$ 仅声明未验证（§8.3）</td>
+</tr>
+<tr>
+<td>$V = {\text{pass}, \text{fail}, \text{skip}, \text{error}, \text{inconclusive}}$</td>
+<td>判定枚举（§4 判定精确）</td>
+</tr>
+<tr>
+<td>$\text{probe} \in {\text{present}, \text{absent}, \text{failed}}$</td>
+<td>探头观测；$\text{failed}$ = 没拿到证据 ≠ 不存在</td>
+</tr>
+<tr>
+<td>$\text{decl} \in {0,1}$</td>
+<td>插件自述是否声明该能力</td>
+</tr>
+<tr>
+<td>$s(\cdot)$</td>
+<td>能力矩阵：能力名 → $S$（假设 $s$ 在 $\text{req}(a)$ 上全域，见 A1）</td>
+</tr>
+<tr>
+<td>$B$</td>
+<td>绑定元组 $(\text{envSnapshot}, \text{工具版本}, \text{模型版本}, \text{种子}, \text{执行顺序})$（§4 确定性优先、§11 绑定项）；$B_{s}$ = 限制到规格 $s$ 的绑定</td>
+</tr>
+<tr>
+<td>$G = (N, E, \tau, \iota, b)$</td>
+<td>组合图：隔离档 $\tau: N \to {\text{vm},\text{proc},\text{container}}$、I/O 类型 $\iota$、跨档桥接标志 $b: E \to {0,1}$（§9.1）</td>
+</tr>
+<tr>
+<td>$\text{valid}(G)$</td>
+<td>静态合法谓词（定义 2.1）</td>
+</tr>
+<tr>
+<td>$H$</td>
+<td>内容寻址哈希（实现取 SHA-256）</td>
+</tr>
+<tr>
+<td>$\text{canon}(\cdot)$</td>
+<td>规范化序列化；$l_i$ 为证据链第 $i$ 条链接值，$\text{root} = l_n$（§11）</td>
+</tr>
+<tr>
+<td>$p_i$</td>
+<td>第 $i$ 条<strong>入链载荷</strong>（record 中参与哈希的判定记录）</td>
+</tr>
+</tbody></table>
+<h3>1.2 假设清单 A0–A10</h3>
+<ul>
+<li><strong>A0（符合性义务）</strong> 本文结论针对 M；实现只有通过与 M 的一致性测试后才继承结论。</li>
+<li><strong>A1（判定纯函数且能力全域）</strong> 断言判定是纯函数 $\rho(a, o, e, \text{err}, s) \to V$，不含时间、随机与外部状态（§8.2 做与判分离、§4 判定精确）；能力矩阵 $s$ 在 $\text{req}(a)$ 上全域（每条断言的必需能力都有确定状态）。缺此全域性 $\rho$ 在未知能力上无定义。</li>
+<li><strong>A2（探头保真）</strong> 探头观测可归一为 $(\text{probe}, \text{decl})$，且 $\text{present}/\text{absent}$ 是对被测对象的<strong>客观事实</strong>（§8.3 信任分级）。这是探测器 soundness 假设；§14 风险 2 指出适配器契约尚未逐行核实。</li>
+<li><strong>A3（环境可固定）</strong> 存在有限可记录的 $B$ 使同一规格可复现；环境漂移可被&quot;环境能力每次测 + 轻量指纹&quot;探测。§14 风险 3 把缓存漏判列为待核项，<strong>未给出完备性论证</strong>，故 A3 记为<strong>脆假设</strong>。</li>
+<li><strong>A4（零共享可变状态，含信道清单）</strong> 平台与被测对象之间、以及<strong>并发可执行的组合节点之间</strong>均无可写共享状态；跨隔离档只经序列化消息桥接。信道清单（<strong>均须为空</strong>）：进程内共享内存/模块级可变状态、文件系统、端口、网络、环境变量、缓存。依据：§4 对象安全、§4 线程安全「并发用例不污染共享状态」、§9 隔离档感知。<strong>§9 只禁止跨档共享，不足以覆盖同档并发</strong>，故此处显式针对同档加强（这是本文的设计约束，不是从 §9 推出的结论）。</li>
+<li><strong>A5（密码学与规范化）</strong> $H$ 在威胁模型内抗碰撞、签名不可伪造（§11）；且 $\text{canon}$ 在<strong>载荷域上单射</strong>——不同载荷不映射到同一字节串（判定是载荷的投影，故载荷域单射蕴含判定域单射）。</li>
+<li><strong>A6（建议器离线）</strong> 只有&quot;离线更新 + 人工确认&quot;后的版本化模型才能进入内核，运行时建议器不改变内核（§9.2/§9.3、§14 风险 4）。</li>
+<li><strong>A7（非对抗故障模型）</strong> 进程内 <code>node:vm</code> 只提供行为隔离，不提供安全隔离（§5.3 注、§14 风险 1）。这是<strong>范围限制</strong>，把 T2 的隔离结论限定在崩溃/泄漏/污染这类非对抗故障内。</li>
+<li><strong>A8（节点确定性）</strong> 组合图中每个节点在固定 $B$ 下是其输入与 $B$ 的确定性函数；随机节点的随机性全部由 $B$ 内的种子驱动（§4 确定性优先）。此假设第 2 版显式列出——它不是从 §9.1 推出的。</li>
+<li><strong>A9（载荷归一化）</strong> 入链载荷 $p_i$ 是 $(\text{判定}_i, B)$ 的确定性函数：运行期可变字段（时间戳、临时路径、耗时读数、未归一化的原始证据串）<strong>不进入载荷</strong>；且 $\text{canon}$ 是<strong>键序不敏感</strong>的规范序列化（同一内容的不同书写顺序必须得到同一字节串）。<strong>这是 T3 反向（判定一致 ⇒ root 相等）成立的必要条件</strong>，见 §2.3 的反例记录。注意：把可变字段&quot;并入 $B$&quot;并不能救回 T3(2)——那样 T3(2) 的&quot;绑定相同&quot;前提就不成立，只能退回 T3(1) 的载荷级重放。</li>
+<li><strong>A10（证据字段存在）</strong> 每条判定记录携带证据来源与可信级字段（§4 可信度显式、§8.3 能力缺失须附证据）。T5 的第三合取项依赖此假设，<strong>不是 T1 的推论</strong>。</li>
+</ul>
+<h3>1.3 设计选择 D1–D2</h3>
+<p>以下不是假设，而是<strong>设计选择</strong>；证明依赖它们，但它们可改（改了结论的条件随之改变）：</p>
+<ul>
+<li><strong>D1（规范序规则）</strong> 调度顺序取 Kahn + 节点 id 字典序 tie-break。该规则定义在定义 2.2；&quot;顺序唯一&quot;由引理 2.2 <strong>推导</strong>，不作为假设。（上一稿把它误列为假设 A5，已修正——那会使 T2 条款 1 循环。）</li>
+<li><strong>D2（双入口同一内核映射）</strong> 本地自检与市场门禁对同一规格 $s$ 使用同一个&quot;规格→执行计划&quot;内核函数（§10）。T4 依赖此设计选择；若两个入口各有一套映射实现，T4 不成立。</li>
+</ul>
+<h3>1.4 定理依赖关系</h3>
+<pre class="mermaid-block"><code class="language-mermaid">flowchart LR
+    A1[&quot;A1 判定纯函数·能力全域&quot;] --&gt; T1[&quot;T1 四态与无假判定&quot;]
+    A2[&quot;A2 探头保真&quot;] --&gt; T1
+    A1 --&gt; T2[&quot;T2 组合判定确定性&quot;]
+    A3[&quot;A3 环境可固定&quot;] --&gt; T2
+    A4[&quot;A4 零共享可变状态&quot;] --&gt; T2
+    A6[&quot;A6 建议器离线&quot;] --&gt; T2
+    A7[&quot;A7 非对抗模型&quot;] --&gt; T2
+    A8[&quot;A8 节点确定性&quot;] --&gt; T2
+    A5[&quot;A5 密码学与规范化&quot;] --&gt; T3[&quot;T3 证据链可检篡改与可重放&quot;]
+    A9[&quot;A9 载荷归一化&quot;] --&gt; T3
+    T2 --&gt; T3
+    T1 --&gt; T4[&quot;T4 双入口同结论&quot;]
+    T2 --&gt; T4
+    T3 --&gt; T4
+    T1 --&gt; T5[&quot;T5 报告无静默跳过&quot;]
+    A10[&quot;A10 证据字段&quot;] --&gt; T5
+    A0[&quot;A0 符合性义务&quot;] -.-&gt;|实现继承前提| T1
+    A0 -.-&gt; T2
+    A0 -.-&gt; T3
+    A0 -.-&gt; T4
+    A0 -.-&gt; T5
+</code></pre>
+<hr>
+<h2>2. 定理主链</h2>
+<h3>2.1 T1 能力四态构成分割，且缺失/未验证能力不产生假 pass/fail</h3>
+<p><strong>条款绑定</strong>：§8.3（四态、信任分级、不产生假 pass/fail）、§4（判定精确、可信度显式、最小信任）。</p>
+<p><strong>定义 1.1（归一函数 $\eta$）</strong></p>
+<p>$$
+\eta(\text{probe}, \text{decl}) =
+\begin{cases}
+P, &amp; \text{probe} = \text{present} \
+A, &amp; \text{probe} = \text{absent} \
+U, &amp; \text{probe} = \text{failed} \wedge \text{decl} = 0 \
+D, &amp; \text{probe} = \text{failed} \wedge \text{decl} = 1
+\end{cases}
+$$</p>
+<p><strong>引理 1.1（全域性与四态分割）</strong> $\eta$ 在 6 个组合上处处有定义，像恰为 $S$，四态原像类两两不交。</p>
+<p><em>证明.</em> 对 $\text{probe}$ 三分支即得全域性；像覆盖由 $(\text{present},\cdot)\to P$、$(\text{absent},\cdot)\to A$、$(\text{failed},0)\to U$、$(\text{failed},1)\to D$ 给出，反向按定义成立，故 $\text{Im}(\eta)=S$；$\eta$ 是函数，故原像类不交。∎</p>
+<blockquote>
+<p><strong>解释性选择</strong>：$(\text{absent}, \text{decl}=1)$ 归入 $A$ 而不新增第五态（&quot;声明冲突&quot;），依据 §8.3「插件自述 = 声明，须实测通过才算已验证」与 §4 最小信任。冲突作为条目上的注解信号记录，不进入状态枚举。</p>
+</blockquote>
+<p><strong>定义 1.2（判定 ρ 为优先链）</strong> 按序取首个命中的分支：</p>
+<table>
+<thead>
+<tr>
+<th>序</th>
+<th>分支条件</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>$\text{err}$</td>
+<td><code>error</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>$\exists c \in \text{req}(a): s(c) = A$</td>
+<td><code>skip</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>$\exists c \in \text{req}(a): s(c) \in {U, D}$</td>
+<td><code>inconclusive</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>$\forall c \in \text{req}(a): s(c) = P$</td>
+<td>$\text{compare}(o,e) \in {\text{pass}, \text{fail}}$</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><strong>解释性选择（须评审）</strong>：§4/§8.3 未规定&quot;$A$ 与 $U/D$ 并存&quot;的先后。本文取&quot;已探测不存在（确定性不适用）优先于不可探测/仅声明&quot;，即上表序 2 先于序 3。分支 1–3 与 4 的守卫<strong>不是互斥分割</strong>而是优先链；序 2/3 可同时为真（如一个必需能力为 $A$、另一个为 $U$），此时取 <code>skip</code>。</p>
+</blockquote>
+<p><strong>定理 T1（无假判定）</strong> 在 A1、A2 下：</p>
+<p>$$
+\rho \in {\text{pass}, \text{fail}} \iff \text{err}=0 \wedge \forall c \in \text{req}(a): s(c) = P
+$$</p>
+<p><em>证明.</em>（$\Leftarrow$）全 $P$ 时分支 1–3 条件全假、分支 4 命中，取 $\text{compare}(o,e)$，由 A1 其值为 pass 或 fail（能力全域性保证分支 4 的条件有定义）。（$\Rightarrow$）设 $\rho \in {\text{pass},\text{fail}}$。若 $\text{err}$ 为真则分支 1 命中得 <code>error</code>，矛盾；否则分支 4 必命中（$\rho$ 落在其值域内），而分支 4 的条件正是 $\forall c: s(c)=P$。∎</p>
+<p><strong>推论 1.1（最小信任）</strong> $s(c) = P \iff \text{probe} = \text{present}$（引理 1.1 的原像类），与 $\text{decl}$ 无关。故&quot;嘴上说支持&quot;永不产生 pass/fail。∎</p>
+<p><strong>推论 1.2（合取）</strong> 任一必需能力非 $P$ ⇒ 判定不属于 ${\text{pass},\text{fail}}$；全 $P$ ⇒ 由 $\text{compare}$ 唯一决定。由 T1 代入。∎</p>
+<p><strong>机检（P1，<code>definitional+teeth</code>，148 例）</strong>：6 组合全域、四态像类、$\eta$ 最小信任反证（声明优先的错误实现必须被检出）、守卫链穷尽性（16 个子集 × 2 种 err 均有分支命中）、首选命中与实现一致、优先级约定（$A$ 先于 $U/D$）、留空与错误优先级两个&quot;必须被检出&quot;的反证、无假判定的错误实现反证。</p>
+<p><strong>条件性</strong>：依赖 A2。若探测器把&quot;探不到&quot;误报为 $\text{present}$，T1 直接失效；§14 风险 2 的适配器契约核实是 T1 的实现前置条件。</p>
+<hr>
+<h3>2.2 T2 合法组合图的执行与判定是确定的</h3>
+<p><strong>条款绑定</strong>：§9.1（无环、静态可校验、确定性、唯一真相源）、§9 末（隔离档感知）、§4（组合可验证、确定性优先、对象安全、线程安全）、§9 版本化替换 B、§11 末。</p>
+<p><strong>定义 2.1（静态合法谓词）</strong></p>
+<p>$$
+\text{valid}(G) \iff \text{acyclic}(G) \wedge \underbrace{\forall (u,v)\in E:\ \tau(u)=\tau(v) \vee b(u,v)}<em>{\text{隔离档约束}} \wedge \underbrace{\forall (u,v)\in E:\ \iota</em>{\text{out}}(u)=\iota_{\text{in}}(v)}_{\text{类型约束}}
+$$</p>
+<p><strong>定义 2.2（规范序 D1）</strong> $\text{order}(G)$ = Kahn 过程每轮从入度 0 的待选节点中取 id 字典序最小者所得的序。</p>
+<p><strong>引理 2.1（无环 ⇒ 拓扑序存在）</strong> $\text{acyclic}(G) \Rightarrow \text{order}(G)$ 含全部节点。</p>
+<p><em>证明.</em> Kahn 论证：无环有向图至少有一个入度 0 节点；删除一个入度 0 节点后剩余图仍无环，过程持续至节点耗尽。∎</p>
+<p><strong>引理 2.2（规范序唯一且与输入顺序无关）</strong> $\text{order}(G)$ 是 $G$ 的函数，不依赖 $N, E$ 的列举顺序。</p>
+<p><em>证明.</em> 归纳：每轮&quot;入度 0 的未访问节点集&quot;仅由 $G$ 与上一轮删除集决定，而删除集由归纳假设唯一确定，其最小元唯一；故本轮选中节点唯一。∎</p>
+<p><strong>引理 2.3（并发可交换）</strong> 在 A4 下，$\text{order}(G)$ 中无依赖路径的两节点并发执行时，任意交错产生相同输出向量。</p>
+<p><em>证明.</em> 两节点间无依赖路径。若二者可互相影响，则存在一条信道（A4 信道清单）携带可写状态：跨档通信必为序列化消息，而消息必有显式边（否则不是通信）——与无路径矛盾；同档并发共享内存/文件/端口/网络/环境/缓存——被 A4 逐项排除。故二者状态分区不交，效果可交换。∎</p>
+<blockquote>
+<p><strong>该引理的地位（第 2 版澄清）</strong>：A4 已直接规定并发节点状态分区不交，因此引理 2.3 是把该设计约束<strong>转写成判定唯一性的一步</strong>，而不是从 §9 推出的新事实。它<strong>没有机检</strong>（无实现可测并发语义）；P2 只给出&quot;违反 A4 会怎样&quot;的必要性反例（共享计数器下两种交错得到不同结果）。</p>
+</blockquote>
+<p><strong>定理 T2（判定确定性）</strong> 在 A1、A3、A4、A6、A7、A8 与 D1 下，若 $\text{valid}(G)$：</p>
+<ol>
+<li>存在唯一的执行顺序 $\text{order}(G)$；</li>
+<li>各节点输出唯一；</li>
+<li>对固定 $B$，复合判定 $\text{Verdict}(G,B)$ 唯一且可复现。</li>
+</ol>
+<p><em>证明.</em>（1）引理 2.1、2.2。（2）对 $\text{order}(G)$ 归纳：节点输入全部来自严格在前节点（拓扑序性质），由归纳假设输入唯一，再由 A8 节点确定性得输出唯一；并发分支由引理 2.3 不改变结果。（3）复合判定是各节点判定的聚合，各节点判定是 A1 的纯函数 $\rho$ 作用于唯一观测的结果，故唯一；重复执行需要同一 $B$，由 <strong>A3</strong> 保证可复现，由 A6 排除运行时建议器改写内核；A7 限定本结论只覆盖非对抗故障模型（范围限制）。∎</p>
+<p><strong>定理 T2′（版本化替换的安全性）</strong> 设模型是版本化不可变工件，且 $M&#39;$ 的节点同样满足 A8。若 $M \to M&#39;$ 的替换满足 $\text{valid}(M&#39;)$ 并产出替换 diff、结果绑定模型版本，则：</p>
+<ol>
+<li>历史结果（对 $(M,B)$ 的记录）不受 $M&#39;$ 影响；</li>
+<li>$M&#39;$ 的引入不破坏确定性，回滚 $M$ 可复现旧结果。</li>
+</ol>
+<p><em>证明.</em>（1）由 T2，历史结果是 $(M,B)$ 的函数；由 §9 版本化替换（模型不可变）与 §11 append-only 记录，$M&#39;$ 不能改写既有记录。（2）$M&#39;$ 过静态校验且节点满足 A8 ⇒ 满足 T2 前提 ⇒ 其结果对 $(M&#39;,B)$ 确定；保留旧版本工件 ⇒ 以 $(M,B)$ 重放即得旧结果。∎</p>
+<p><strong>必要性（去掉哪条会塌）</strong></p>
+<table>
+<thead>
+<tr>
+<th>去掉</th>
+<th>反例 / 后果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>无环性</td>
+<td>有环则无拓扑序，&quot;先跑谁&quot;未定义 ⇒ 条款 1 失效</td>
+</tr>
+<tr>
+<td>D1 tie-break</td>
+<td>合法拓扑序不唯一 ⇒ <strong>仅条款 1 失效</strong>（A4 下判定仍唯一）；若连 A4 一起去掉，才进一步导致判定不唯一</td>
+</tr>
+<tr>
+<td>隔离档约束 / A4</td>
+<td>共享计数器：$u$ 自增、$v$ 读取，两种交错得到不同观测 ⇒ 判定不唯一（P2 已机检该反例成立）</td>
+</tr>
+<tr>
+<td>A8 节点确定性</td>
+<td>节点输出依赖未绑定的内部状态 ⇒ 条款 2 失效</td>
+</tr>
+<tr>
+<td>种子/版本绑定（$B$）</td>
+<td>随机节点两次运行采样不同 ⇒ 判定可能翻转（P2 以语义化 LCG 抽样检过种子敏感性）</td>
+</tr>
+</tbody></table>
+<p><strong>机检（P2，<code>partial</code>，67834 例）</strong>：</p>
+<ul>
+<li><strong>双实现复核（环检测）</strong>：全部 <strong>16 条有序对（含 4 条自环）</strong> 的 $2^{16}=65536$ 个子图上，Kahn 与独立的三色 DFS 的<strong>环判定</strong>必须一致（这是有齿的比较：变异体 M2/M7 都在此失败）。含自环的子图被计入并单独断言非空，故&quot;自环必须被<strong>无环</strong>规则拒绝&quot;确被行使——为此节点 <code>n4</code> 取 <code>out === in</code>，使自环无法被类型规则顺带拒绝（第 2 版此处只靠类型规则，等同一个漏检；已修正）。<strong>不再</strong>声称&quot;节点覆盖数被独立核对&quot;：那类等式在无环时由算法定义直接蕴含，属空真（第 4 版按评审删除）。</li>
+<li><strong>双实现复核（合法谓词）</strong>：隔离档与类型两个合取项由<strong>两张独立解析出的节点表</strong>（对象表 vs 规格字符串表）分别求值后比较；同档 2 边 × 跨档 4 边的 3 状态配置（<code>absent</code>/未桥接/桥接）穷举 4×81 组，并分别存在&quot;因隔离档非法&quot;与&quot;因类型不符非法&quot;的非空反例（断言计数 &gt; 0）。环判定两种实现另作比较（Kahn vs DFS）；不再保留&quot;<code>impl.valid === def.valid</code>&quot;这一自比较（第 2 版残留，已删除）。</li>
+<li><strong>节点取值与入边列举顺序无关</strong>：对含两条入边的节点，打乱边数组后取值不变（去掉 <code>runPure</code> 的入边排序即失败）。</li>
+<li><strong>必要性反例（有齿）</strong>：同一执行器 + 共享状态存储 ⇒ 两交错下<strong>各节点最终读数</strong>不同；换成私有状态存储 ⇒ 相同；语义化 LCG 抽样不同种子给出不同读数。</li>
+<li><strong>演示（非有齿，脚本内标注 <code>演示</code>）</strong>：确定性节点重复执行一致、有状态执行器漂移——由构造保证，仅说明 A8 的必要性方向。</li>
+<li><strong>不覆盖</strong>：引理 2.3 的并发语义本身、T2 条款 3 的实际重放，均无机检。</li>
+</ul>
+<p><strong>条件性</strong>：A7 使&quot;隔离&quot;只是行为隔离。把 T2 读成安全隔离在 <code>node:vm</code> 档是<strong>错误推断</strong>（§14 风险 1）。</p>
+<hr>
+<h3>2.3 T3 证据链可检测篡改，且在 A9 下可重放验证</h3>
+<p><strong>条款绑定</strong>：§11（append-only、内容寻址、绑环境快照 + 工具/模型版本 + 种子、可重放验证）、§3（准确性）、§4（可信度显式）。</p>
+<p><strong>第 2 版修订说明（重要）</strong>：上一稿把 T3 写成双向命题&quot;root 相等 $\iff$ 判定逐条一致&quot;，该命题<strong>为假</strong>——载荷除判定外还含证据/耗时等运行期可变字段，判定一致不蕴含载荷一致。下面拆成三条引理 + 一个条件化定理，并保留可执行反例。</p>
+<p><strong>定义 3.1（链构造）</strong> 对载荷序列 $p_1..p_n$：</p>
+<p>$$
+l_0 = H(\text{GENESIS} | \text{canon}(B)),\quad h_i = H(\text{canon}(p_i)),\quad l_i = H(l_{i-1} | h_i),\quad \text{root}=l_n,\quad \sigma=\text{Sign}(\text{root})
+$$</p>
+<p>$B$ 经 $l_0$ 进入链，故 root 绑定环境快照、工具/模型版本与种子。其中 $\text{canon}$ 按 A9 取<strong>键序不敏感</strong>的规范序列化；数组顺序仍是语义（链是 append-only，条目次序本身参与哈希）。</p>
+<p><strong>引理 3.1（篡改可检）</strong> 在 A5 下，$p_i&#39; \neq p_i \Rightarrow \text{root}&#39; \neq \text{root}$。</p>
+<p><em>证明.</em> 由 A5 载荷域单射，$\text{canon}(p_i&#39;) \neq \text{canon}(p_i) \Rightarrow h_i&#39; \neq h_i$（否则构造 $H$ 碰撞，违背 A5）$\Rightarrow l_i&#39; \neq l_i \Rightarrow$ 向后逐项传播 $\Rightarrow \text{root}&#39; \neq \text{root}$。∎</p>
+<p><strong>引理 3.2（顺序与截断可检）</strong> 交换两条目或删除尾部条目使 root 变化（或长度计数不匹配）。</p>
+<p><em>证明.</em> 交换时 $l_i$ 的输入对调、$\text{canon}$ 不同 ⇒ $h$、$l$ 随之不同（A5）⇒ root 变。截断时条目数变化；若末链值恰相等则构成 $H$ 碰撞，违背 A5。∎</p>
+<p><strong>引理 3.3（A9 下的载荷确定）</strong> 在 A9 下，判定逐条一致且绑定相同 ⇒ 载荷逐条一致。</p>
+<p><em>证明.</em> 由 A9，$p_i$ 是 $(\text{判定}_i, B)$ 的确定性函数；两条件给出相同的自变量，函数值相同。∎</p>
+<p><strong>定理 T3（可重放验证）</strong> 在 A5 与 A9 下，以 $C$ 中记录的同一 $B$ 重跑同一规格：</p>
+<ol>
+<li>$\text{root}(\text{replay}(B)) = \text{root}(C) \iff$ 重放载荷与记录载荷逐条一致；</li>
+<li>若 A9 成立，则上式 $\iff$ 重放判定与记录判定逐条一致。</li>
+</ol>
+<p><em>证明.</em>（1）$\Rightarrow$：由 A5 抗碰撞，同一 root 的相异链必在某 $l_i$ 分歧；$i=0$ 得 $B$ 不同（与前提矛盾），$i\ge1$ 得某 $h_i$ 不同 ⇒ 由载荷域单射得该载荷不同。$\Leftarrow$：载荷逐条一致且 $B$ 相同 ⇒ 同一链构造 ⇒ root 相同。（2）由引理 3.3 双向代入。重放判定本身与记录一致另由 T1（$\rho$ 纯函数）与 T2（执行确定）保证，A3 保证两次运行取到同一 $B$。∎</p>
+<p><strong>反例记录（A9 的必要性，已机检）</strong>：取同一 $B$、判定向量同为 <code>[&#39;pass&#39;,&#39;skip&#39;]</code>，但证据字段为 <code>obs#7 latency=12ms</code> 与 <code>obs#7 latency=31ms</code>。实测两链 root <strong>不同</strong>（P3 3d）。故<strong>没有 A9 就没有 T3(2)</strong>；T3(1) 始终成立。设计含义：报告入链前必须归一化运行期可变字段，否则&quot;可重放&quot;退化为&quot;载荷级可重放&quot;。</p>
+<p><strong>机检（P3，<code>partial</code>，17 例）</strong>：链式与 Merkle 两种独立构造逐条篡改均检出、重排/截断检出、$B$ 四个分量任一变化改变 root；A9 双向演示（另有 1 条纯幂等断言在脚本内标注为 <code>演示</code>，不计入有齿）——<strong>正向</strong>用两份独立构造的同判定载荷（仅键序不同，并断言朴素 <code>JSON.stringify</code> 对键序敏感）验证 <code>canon</code> 键序无关；<strong>负向</strong>用恰为本文记录的两条载荷 <code>[&#39;pass&#39;,&#39;skip&#39;]</code>、证据漂移 <code>latency=12ms</code>/<code>31ms</code> 验证 root 不同。</p>
+<p><strong>条件性</strong>：方向 2 依赖 A9（设计义务，M 尚未实现）；整条 T3 的实际重放依赖 A3（脆假设，§14 风险 3）。</p>
+<hr>
+<h3>2.4 T4 同一规格在双入口得到同结论</h3>
+<p><strong>条款绑定</strong>：§10（双入口同结论、dry-run 可预测、门禁判过可本地复现）、§11 末（复现以已确认图为准）、§4（规格先行）。</p>
+<p><strong>定理 T4（双入口一致）</strong> 在 T1、T2、T3、D2 下，对同一规格 $s$ 与其规范绑定 $B_s$，本地自检与市场门禁对 $s$ 的<strong>内核判定</strong>一致；<code>gate dry-run</code> 的预测等于门禁对 $s$ 的结果。</p>
+<p><em>证明.</em> 由 D2，两入口对同一 $s$ 调用同一个&quot;规格→执行计划&quot;映射，其后只经过内核纯函数序列 $(\eta, \text{valid}, \text{order}, \rho, \text{chain})$。入口差异只在被处理规格的<strong>集合</strong>与调度（单插件 vs 批量）、以及是否发布证据。对 $s$ 与 $B_s$，两侧自变量相同 ⇒ 由 T2 判定唯一 ⇒ 判定一致。dry-run 与正式门禁共用该函数，只跳过发布步骤。∎</p>
+<p><strong>条件与边界（第 2 版收紧）</strong>：</p>
+<ul>
+<li>$B$ 含<strong>执行顺序</strong>。门禁是批量/多插件，本地是单插件，二者的整体 $B$ <strong>通常不同</strong>；因此 T4 只对<strong>限制到规格 $s$ 的 $B_s$</strong> 成立，且只对 $s$ 的内核判定成立，不对&quot;整批报告&quot;成立。</li>
+<li>若两侧 $B_s$ 也不同（环境快照不同），结果可合理地不同——报告须记录 $B_s$ 才能审计差异。</li>
+<li>§10 与本文 §0 的&quot;同结论&quot;一词按上述限定理解；<strong>T4 未做机检</strong>（无实现）。</li>
+</ul>
+<hr>
+<h3>2.5 T5 报告完整：无静默跳过</h3>
+<p><strong>条款绑定</strong>：§4（完整性可验证、规格先行）、§6（覆盖率边界）、§8.3（能力缺失打 skip 并附证据）。</p>
+<p><strong>定义 5.1</strong> 应跑清单 $R$ 是由已确认规格生成的<strong>集合</strong>（<strong>先于</strong>能力门控，不反推自结果）。运行把每个 $i \in R$ 归入唯一桶 $b(i) \in V$。</p>
+<p><strong>定理 T5（五桶分割不变式）</strong> 在 §4 规格先行与 A10 下，报告满足：</p>
+<p>$$
+\forall i \in R:\ \big|{v \in V: i \in \text{bucket}<em>v}\big| = 1
+\ \wedge\ \bigcup</em>{v\in V}\text{bucket}<em>v = R
+\ \wedge\ \forall i \in \text{bucket}</em>{\text{skip}}\cup\text{bucket}_{\text{inconclusive}}:\ i \text{ 带原因与证据}
+$$</p>
+<p><em>证明.</em> 规格先行使 $R$ 在运行前确定且与结果无关；内核按 $R$ 枚举、对每条调用 $\rho$ 并打标入桶，入桶函数以 $i$ 为定义域全域且单值 ⇒ 唯一归属；枚举覆盖 $R$ ⇒ 并集相等。第三合取项由 <strong>A10</strong> 提供（每条判定带证据字段）；软判定必须附证据是 §8.3 对能力缺失的要求。完整性检测器重算分割并与报告比对，可发现任一破坏。∎</p>
+<p><strong>必要性</strong>：若 $R$ 改为&quot;从结果反推&quot;（§4 明令禁止），<code>skip</code>/<code>inconclusive</code> 条目会自然消失，静默跳过不可检——故&quot;规格先行&quot;是 T5 的必要条件。</p>
+<p><strong>机检（P4，<code>partial</code>，378 例）</strong>：$2^6=64$ 个子集的正向分割，以及&quot;静默丢弃 / 重复归属 / 软判定缺证据 / <strong>多出外来条目</strong> / <strong>外来 id 顶替必需 id</strong>&quot;五类否定反例（后两类分别行使长度守卫与成员守卫；第 2 版这两条守卫单独移除仍全绿，已修正）；$R$ 含重复 id 时按集合语义去重（直接以重复入参检验）。</p>
+<p><strong>边界（第 2 版补充）</strong>：P4 只检查证据字段<strong>非空</strong>，<strong>无法识别伪造证据</strong>；T5 的&quot;完整&quot;是相对已声明口径 $R$ 的完整，不主张真实缺陷覆盖完备（§14 风险 5、§6 覆盖率边界）。两者不可混淆。</p>
+<hr>
+<h2>3. 可执行证据</h2>
+<pre><code>$ node theory-model-check.mjs
+theory-model-check — architecture.md 抽象模型自检
+node v24.21.0
+  ✓ P1 能力四态与判定纪律  [definitional+teeth]  (cases=148, failed=0)
+  ✓ P2 组合图可校验性与确定性  [partial]  (cases=67834, failed=0)
+  ✓ P3 证据链篡改检测与重放  [partial]  (cases=17, failed=0)
+  ✓ P4 完整性五桶分割  [partial]  (cases=378, failed=0)
+  注: 引理 2.3（并发可交换）本身无机检；P2 只含&quot;违反 A4 会怎样&quot;的必要性反例。
+  注: T3 的&quot;判定一致 ⇒ root 相等&quot;方向依赖 A9（载荷归一化），由 P3 3d 显式演示。
+
+PASS — total cases=68377
+$ echo $?
+0
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>检查</th>
+<th>覆盖</th>
+<th>诚实分类</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>P1 能力四态与判定纪律</td>
+<td>T1、引理 1.1、推论 1.1/1.2</td>
+<td><strong>定义自洽 + 有齿</strong>（含错误实现/错误优先级/守卫留空反证）</td>
+</tr>
+<tr>
+<td>P2 组合图可校验性与确定性</td>
+<td>T2 条款 1、引理 2.1/2.2、定义 2.1</td>
+<td><strong>双实现复核 + 部分有齿</strong>（环检测含自环、合法谓词、入边顺序三项）；引理 2.3 与条款 3 <strong>无机检</strong></td>
+</tr>
+<tr>
+<td>P3 证据链篡改检测与重放</td>
+<td>引理 3.1/3.2、T3(1)、A9 双向</td>
+<td><strong>双实现有齿</strong>（链式 vs Merkle）；A9 正/负两向均已构造</td>
+</tr>
+<tr>
+<td>P4 完整性五桶分割</td>
+<td>T5</td>
+<td><strong>否定方向有齿</strong>（丢弃/重复/缺证据/多外来条目/外来 id 五类），正方向由构造；伪造证据不可检</td>
+</tr>
+</tbody></table>
+<h3>3.1 变异测试：机检&quot;有齿&quot;的可复现证明</h3>
+<p>单靠&quot;断言通过&quot;无法排除断言本身空转。故用变异测试反证：注入 9 个已知错误模型，要求<strong>每个变异体必须被检出</strong>（<a href="theory-model-mutations.sh">theory-model-mutations.sh</a> sha256 <code>bb442529e909b382c3d1f86eb107f8aa7071e198336ed512e7c4c21bced9998c</code>；日志 <a href="theory-model-mutations.log">theory-model-mutations.log</a> sha256 <code>35d45cd2b16861925eaa0bfccaf785a565ccf6aefad290820aac3ac4157aeb45</code>）：</p>
+<pre><code>theory-model-check 变异测试（每个变异体都必须被检出）
+  baseline    exit=0  PASS — total cases=68377
+  detected    M1 合法谓词丢掉隔离档+类型合取 (valid := noCycle)  (exit=1)
+  detected    M2 Kahn 的 acyclic 恒为 true  (exit=1)
+  detected    M3 判定优先链把 U/D 提到 A 之前  (exit=1)
+  detected    M4 canon 退回键序敏感的 JSON.stringify  (exit=1)
+  detected    M5 状态分区不交的断言改用共享存储  (exit=1)
+  detected    M6 能力归一让声明覆盖客观探测  (exit=1)
+  detected    M7 三色 DFS 对自环视而不见  (exit=1)
+  detected    M8 节点取值丢掉入边排序  (exit=1)
+  detected    M9 完整性检测丢掉长度守卫  (exit=1)
+
+ALL MUTANTS DETECTED — 机检对上述 9 个错误模型均有牙齿
+</code></pre>
+<p>其中 <strong>M1 正是第二轮评审用来证明&quot;P2 谓词自比较空转&quot;的那个变异</strong>（第 2 版下仍 PASS，即漏检；第 3 版下 FAIL，即检出），<strong>M7 是第三轮评审用来证明&quot;自环覆盖是幻觉&quot;的变异</strong>（第 3 版下仍 PASS；第 4 版下 FAIL）。变异测试只覆盖这 9 个方向，仍是<strong>抽样</strong>而非全覆盖。</p>
+<p><strong>证据边界（必读）</strong>：脚本不读取 architecture.md 文本、也不是 M 的实现；它<strong>不能</strong>证明 M 正确，只能证明本文形式定义内部自洽、且若干&quot;错误模型必须被检出&quot;的检查确有牙齿。脚本内标 <code>演示</code> 的断言由构造保证、不计入有齿；已对 9 个方向的错误模型做变异测试并全部检出（§3.1）。T4 与引理 2.3 <strong>完全没有机检</strong>。复现：<code>node theory-model-check.mjs</code>（无网络、无时间依赖、伪随机为固定种子 LCG）；输出依赖 node 版本（本稿 <code>v24.21.0</code>），日志 sha256 见文首。</p>
+<hr>
+<h2>4. 边界、反例与不可证项</h2>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>边界（来源）</th>
+<th>影响</th>
+<th>处理</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>B1</strong></td>
+<td><code>node:vm</code> 并非安全边界，只做行为隔离（§14 风险 1、§5.3 注）</td>
+<td>T2 的&quot;隔离&quot;读法</td>
+<td>仅非对抗故障模型（A7）下成立；对抗性隔离须子进程/容器</td>
+</tr>
+<tr>
+<td><strong>B2</strong></td>
+<td><code>cordis-host-runner</code> 等契约未逐行核实（§14 风险 2）</td>
+<td>T1 的 A2、T2 的适配器语义</td>
+<td>结论停留在设计层；实现前须逐条对齐</td>
+</tr>
+<tr>
+<td><strong>B3</strong></td>
+<td>能力探测失效触发器完备性（§14 风险 3：缓存漏判会产生假失败）</td>
+<td>T3 的可重放性、T1 的缓存时效</td>
+<td>条件性；&quot;环境能力每次测 + 轻量指纹&quot;堵漏，未覆盖因子列为残余风险</td>
+</tr>
+<tr>
+<td><strong>B4</strong></td>
+<td>学习建议器的确定性张力（§14 风险 4）</td>
+<td>T2</td>
+<td>A6 强制离线更新 + 人工确认；允许运行时自动改内核则 T2 立即失效</td>
+</tr>
+<tr>
+<td><strong>B5</strong></td>
+<td>黑盒二进制插件只能行为/接口覆盖（§14 风险 5、§6）</td>
+<td>T5 的&quot;完整&quot;口径</td>
+<td>T5 只承诺相对 $R$ 的完整</td>
+</tr>
+<tr>
+<td><strong>B6</strong></td>
+<td>性能/安全/通用性/可扩展性</td>
+<td>—</td>
+<td>显式非目标</td>
+</tr>
+</tbody></table>
+<p><strong>未证与不可证清单</strong>（不得读成&quot;已通过&quot;）：</p>
+<ol>
+<li><strong>实现符合性</strong>——M 无实现，A0 义务未履行。</li>
+<li><strong>探头 soundness/完备性</strong>——A2 是假设（§14 风险 2 未核实）。</li>
+<li><strong>环境可复现性</strong>——A3 是脆假设（§14 风险 3 无完备性论证）。</li>
+<li><strong>载荷归一化（A9）</strong>——这是 T3(2) 的必要条件，属<strong>设计义务</strong>，M 未实现、未核实。</li>
+<li><strong>对抗性隔离</strong>——B1，明确不可由 T2 推出。</li>
+<li><strong>真实覆盖率完备</strong>——B5，明确不可由 T5 推出。</li>
+<li><strong>Fiber 状态机（§13）活性/安全性</strong>——<code>PENDING → LOADING → ACTIVE → UNLOADING → DISPOSED ↘ FAILED</code> 的终止性、无死锁、<code>FAILED</code> 可达性未证明（后续工作项）。</li>
+<li><strong>建议器质量</strong>——只约束&quot;不受信 + 离线&quot;，不证明建议正确性或召回率。</li>
+<li><strong>证据真实性</strong>——链条只保证&quot;内容未被篡改&quot;，不保证内容为真（A10 的证据字段可被伪造）。</li>
+</ol>
+<hr>
+<h2>5. 结论</h2>
+<ul>
+<li>在 A0–A10 与 D1–D2 内，<strong>T1、T2、T2′、T3、T4、T5</strong> 成立；其中 T3(2)、T4 明确<strong>条件性</strong>，T2 的隔离读法受 A7 限制，T5 受 B5 限制。</li>
+<li>机检（68377 例）的角色是<strong>定义自洽复核 + 必要性反例</strong>，覆盖 T1/T2 条款 1/引理 3.1-3.2/T5 的一部分；<strong>T4、引理 2.3、T2 条款 3 无任何机检</strong>。机检&quot;有齿&quot;本身由 9 个变异体反证（§3.1），不再是自述。</li>
+<li>本证明不改动 architecture.md 的任何设计决策；把其隐式前提显式化为 A0–A10，并标出<strong>尚未核实</strong>的前提（A2、A3、A9）。</li>
+<li><strong>最重要的两条提醒</strong>：<ol>
+<li><code>root 相等</code> 只有在 <strong>A9（载荷归一化）</strong> 成立时才是&quot;判定逐条一致&quot;的凭证；否则它只是&quot;载荷逐条一致&quot;的凭证。上一稿的强断言已被反例推翻并修正。</li>
+<li><code>node:vm</code> 的隔离与黑盒覆盖率<strong>不是</strong>可验证性质；把它们当作已证结论是过度声明。</li>
+</ol>
+</li>
+</ul>
+<hr>
+<h2>附录 A：条款 → 定理对照</h2>
+<table>
+<thead>
+<tr>
+<th>architecture.md 条款</th>
+<th>内容</th>
+<th>对应</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>§4 判定精确</td>
+<td>显式 verdict 枚举，无隐式通过</td>
+<td>定义 1.2、T1</td>
+</tr>
+<tr>
+<td>§4 最小信任</td>
+<td>只信外部可观察证据</td>
+<td>推论 1.1</td>
+</tr>
+<tr>
+<td>§4 可信度显式</td>
+<td>判定绑证据来源 + 可信级</td>
+<td>A10、T5、T3（载荷含证据字段）</td>
+</tr>
+<tr>
+<td>§4 对象安全 / 线程安全</td>
+<td>零共享可变状态、并发不污染</td>
+<td>A4、引理 2.3、T2</td>
+</tr>
+<tr>
+<td>§4 确定性优先</td>
+<td>钉死环境/版本/种子/顺序</td>
+<td>A3、A8、B、T2、T3</td>
+</tr>
+<tr>
+<td>§4 完整性可验证</td>
+<td>应跑/已跑/覆盖缺口</td>
+<td>T5</td>
+</tr>
+<tr>
+<td>§4 组合可验证</td>
+<td>组合规则静态校验；组合判定是成分判定的确定性函数</td>
+<td>定义 2.1、T2</td>
+</tr>
+<tr>
+<td>§4 规格先行</td>
+<td>断言与报告由规格生成，不从结果反推</td>
+<td>T5 必要性</td>
+</tr>
+<tr>
+<td>§5.3 三档隔离 + <code>node:vm</code> 注</td>
+<td>行为隔离 ≠ 安全边界</td>
+<td>A7、B1</td>
+</tr>
+<tr>
+<td>§6 覆盖率边界</td>
+<td>黑盒只能行为/接口覆盖</td>
+<td>B5、T5 边界</td>
+</tr>
+<tr>
+<td>§8.2 做与判分离</td>
+<td>断言独立 SPI</td>
+<td>A1</td>
+</tr>
+<tr>
+<td>§8.3 四态 / 信任分级 / 不产生假判定</td>
+<td>能力矩阵与判定纪律</td>
+<td>定义 1.1、引理 1.1、T1</td>
+</tr>
+<tr>
+<td>§9.1 组合图无环、确定性、唯一真相源</td>
+<td>静态可校验 + 确定性</td>
+<td>定义 2.1、T2</td>
+</tr>
+<tr>
+<td>§9.2/§9.3 建议器与人工把关</td>
+<td>建议不受信、人工确认</td>
+<td>A6</td>
+</tr>
+<tr>
+<td>§9 隔离档感知</td>
+<td>同档直连、跨档桥接</td>
+<td>定义 2.1、引理 2.3</td>
+</tr>
+<tr>
+<td>§9 版本化替换 B</td>
+<td>模型不可变、结果绑定版本、可回滚</td>
+<td>T2′</td>
+</tr>
+<tr>
+<td>§10 双入口</td>
+<td>同规格同结论、dry-run 可预测</td>
+<td>D2、T4</td>
+</tr>
+<tr>
+<td>§11 证据链</td>
+<td>append-only、内容寻址、签名、可重放</td>
+<td>定义 3.1、引理 3.1/3.2、T3</td>
+</tr>
+<tr>
+<td>§11 末</td>
+<td>在线建议不改变历史结果</td>
+<td>T2′</td>
+</tr>
+<tr>
+<td>§14 风险 1–5</td>
+<td>风险项</td>
+<td>B1–B5</td>
+</tr>
+</tbody></table>
+<h2>附录 B：假设 → 风险对照</h2>
+<table>
+<thead>
+<tr>
+<th>假设/设计选择</th>
+<th>强度</th>
+<th>对应风险</th>
+<th>若失效的后果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A0 符合性义务</td>
+<td>义务性</td>
+<td>无实现</td>
+<td>结论不可传递到代码</td>
+</tr>
+<tr>
+<td>A1 判定纯函数·能力全域</td>
+<td>设计约束</td>
+<td>§8.2</td>
+<td>判定不可复现；能力未知时 ρ 无定义</td>
+</tr>
+<tr>
+<td>A2 探头保真</td>
+<td><strong>脆</strong></td>
+<td>§14 风险 2</td>
+<td>假 pass（误报 present）或大面积 skip</td>
+</tr>
+<tr>
+<td>A3 环境可固定</td>
+<td><strong>脆</strong></td>
+<td>§14 风险 3</td>
+<td>T2 条款 3、T3 的重放失效</td>
+</tr>
+<tr>
+<td>A4 零共享可变状态</td>
+<td>设计约束（<strong>含同档并发，本文加强</strong>）</td>
+<td>§4 对象安全/线程安全</td>
+<td>并发交错影响判定</td>
+</tr>
+<tr>
+<td>A5 密码学与规范化</td>
+<td>标准假设 + 设计义务</td>
+<td>§11 签名</td>
+<td>篡改不可检（抗碰撞失效）或反向结论不成立（单射失效）</td>
+</tr>
+<tr>
+<td>A6 建议器离线</td>
+<td>流程约束</td>
+<td>§14 风险 4</td>
+<td>运行时不确定性进入内核</td>
+</tr>
+<tr>
+<td>A7 非对抗故障模型</td>
+<td><strong>范围限制</strong></td>
+<td>§14 风险 1</td>
+<td>把行为隔离误读为安全隔离</td>
+</tr>
+<tr>
+<td>A8 节点确定性</td>
+<td>设计约束（第 2 版新增）</td>
+<td>§9.1</td>
+<td>T2 条款 2 失效</td>
+</tr>
+<tr>
+<td>A9 载荷归一化</td>
+<td><strong>设计义务（第 2 版新增）</strong></td>
+<td>§11</td>
+<td>T3(2) 不成立（已有反例）</td>
+</tr>
+<tr>
+<td>A10 证据字段存在</td>
+<td>设计义务（第 2 版新增）</td>
+<td>§4 可信度显式</td>
+<td>T5 第三合取项不成立</td>
+</tr>
+<tr>
+<td>D1 规范序规则</td>
+<td>设计选择</td>
+<td>§4 确定性优先</td>
+<td>拓扑序不唯一（判定仍唯一）</td>
+</tr>
+<tr>
+<td>D2 双入口同一映射</td>
+<td>设计选择</td>
+<td>§10</td>
+<td>T4 不成立</td>
+</tr>
+</tbody></table>
+<h2>附录 C：评审修订记录（第 1 版 → 第 5 版）</h2>
+<p>两份独立对抗式评审（各自全新上下文、只读、可执行脚本）对第 1 版给出的结论为 <strong>flawed</strong>：1 critical、6 major、10 minor。逐条处置：</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>第 1 版问题</th>
+<th>处置</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1</td>
+<td><strong>critical</strong>：T3 双向命题为假（判定一致 ⇏ 载荷一致，证据字段可变）</td>
+<td>拆为引理 3.1/3.2/3.3 + 条件化 T3；新增 A9；反例写入 §2.3 并由 P3 3d 机检</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>P1/P3 语录式自证；P2 谓词一致性断言空真；&quot;检测器有齿&quot;过度声明</td>
+<td>重写 P1（守卫链穷尽性 + 留空/错误优先级/错误实现反证）、P2（独立 DFS 双实现 + 3 状态隔离配置）、P3（Merkle 双实现 + A9 演示）；第 3 节改为逐项诚实分类</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>引理 2.3 因 A4 已含结论而循环</td>
+<td>A4 增加信道清单；引理 2.3 标注为&quot;设计约束的转写&quot;且<strong>无机检</strong></td>
+</tr>
+<tr>
+<td>C4</td>
+<td>T2 缺 A3，且隐含&quot;节点确定性&quot;前提</td>
+<td>T2 假设补 A3，新增 A8；T2 的隔离读法受 A7 限制</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>原 A5（规范序）使 T2 条款 1 循环</td>
+<td>删除该假设，规范序降为设计选择 D1（定义 2.2 + 引理 2.2 推导唯一性）</td>
+</tr>
+<tr>
+<td>C6</td>
+<td>tie-break 必要性行与 A4 矛盾</td>
+<td>改写为&quot;仅条款 1 失效&quot;；共享文件反例移到 A4 行</td>
+</tr>
+<tr>
+<td>C7</td>
+<td>错误声称 T4 有机检</td>
+<td>§5 与第 3 节明确 T4 <strong>无机检</strong></td>
+</tr>
+<tr>
+<td>C8</td>
+<td>定义 2.1 缺类型合取项（与注释矛盾）</td>
+<td>补入公式，并在 P2 增加&quot;因类型不符非法&quot;的反例</td>
+</tr>
+<tr>
+<td>C9</td>
+<td>A6 单射性声明在判定域，却被用于载荷域</td>
+<td>A5 改为<strong>载荷域</strong>单射（蕴含判定域）</td>
+</tr>
+<tr>
+<td>C10</td>
+<td>T5 证据合取项误归因 T1</td>
+<td>新增 A10 并改归因 §4/§8.3；附录 A 相应修正</td>
+</tr>
+<tr>
+<td>C11</td>
+<td>T2′ 隐含节点确定性、误用 A6</td>
+<td>补 A8 前提；历史不变性改引 §9/§11</td>
+</tr>
+<tr>
+<td>C12</td>
+<td>§14 风险 3&quot;明确未证&quot;过度解读</td>
+<td>软化为&quot;列为待核项、无完备性论证&quot;</td>
+</tr>
+<tr>
+<td>C13</td>
+<td>T4 的 $B$ 含执行顺序导致前提通常不满足</td>
+<td>引入 $B_s$；限定为&quot;规格 $s$ 的内核判定&quot;；补 D2</td>
+</tr>
+<tr>
+<td>C14</td>
+<td>A1 签名与定义 1.2 不一致、能力全域性未声明</td>
+<td>A1 补齐 $s$ 与全域性</td>
+</tr>
+<tr>
+<td>C15</td>
+<td>引用约定缺 <code>§11 末</code>；A5 误引 §9.1；&quot;线建议&quot;错字</td>
+<td>补约定；改引 §4 确定性优先；修错字</td>
+</tr>
+<tr>
+<td>C16</td>
+<td>未给出日志哈希、未声明 node 版本参与复现</td>
+<td>文首记录日志 sha256 与 <code>node v24.21.0</code></td>
+</tr>
+</tbody></table>
+<p>上一稿被推翻的具体断言已在下文保留痕迹（§2.3 反例记录、附录 B 的 A9 行），不再以&quot;已证&quot;形式出现。</p>
+<p><strong>第二轮复核（针对第 2 版的定向复核）</strong>：结论为 <code>fixes-confirmed for critical</code>、<code>flaws-remain for check hygiene</code>——C1 的 T3 修复、类型合取项、A5 定义域、T4&quot;无机检&quot;声明均被确认为<strong>真修复</strong>；但机检侧仍有两处&quot;改标签未改实质&quot;的自比较：</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>第 2 版残留问题</th>
+<th>处置（第 3 版）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C17</td>
+<td>P2 的 <code>(order.length===n)===acyclic</code> 仍是 <code>x===x</code></td>
+<td>删除该断言；初版改为独立 DFS 的<strong>访问计数</strong>交叉核对（该&quot;覆盖数&quot;断言随后又被 C28/C32 判定为空真并删除，见下）</td>
+</tr>
+<tr>
+<td>C18</td>
+<td>P2 的 <code>impl.valid === def.valid</code> 是同一函数自比较（文档却写&quot;独立求值&quot;）</td>
+<td>新增第二条求值路径：从<strong>规格字符串</strong>另解析节点表 + DFS 求值，与其比较；并断言两表描述同一事实</td>
+</tr>
+<tr>
+<td>C19</td>
+<td>A4 必要性反例对共享状态<strong>无敏感性</strong>（差异只来自节点名排列）</td>
+<td>改为&quot;同一执行器 + 共享/私有两种状态存储&quot;，比较<strong>各节点最终读数</strong>（与顺序无关）</td>
+</tr>
+<tr>
+<td>C20</td>
+<td>A9 正向演示是 <code>f(x)===f(x)</code></td>
+<td>改为两份<strong>独立构造</strong>的同判定载荷（仅键序不同）比较，并断言朴素 <code>JSON.stringify</code> 键序敏感 ⇒ 赋予 <code>canon</code> 键序无关的新要求</td>
+</tr>
+<tr>
+<td>C21</td>
+<td>私有状态演示&quot;按构造成立&quot;、无检验价值</td>
+<td>与 C19 合并为同一 <code>runStore</code>，两个存储实现共用执行路径</td>
+</tr>
+<tr>
+<td>C22</td>
+<td>三处 <code>演示</code> 级断言被写成&quot;有齿&quot;</td>
+<td>脚本内标注 <code>演示</code>，文档同步区分（§3 覆盖表与证据边界）</td>
+</tr>
+<tr>
+<td>C23</td>
+<td>文档记录的 A9 反例（<code>[&#39;pass&#39;,&#39;skip&#39;]</code>）与脚本实际跑的单载荷不一致</td>
+<td>脚本改为<strong>完全一致</strong>的两载荷漂移实例</td>
+</tr>
+<tr>
+<td>C24</td>
+<td>A9 的&quot;或已被归入 $B$&quot;会自毁 T3(2) 前提</td>
+<td>删除该分支，并说明并入 $B$ 只能退回 T3(1)</td>
+</tr>
+<tr>
+<td>C25</td>
+<td>仅&quot;断言通过&quot;无法排除断言空转</td>
+<td>新增变异测试 <a href="theory-model-mutations.sh">theory-model-mutations.sh</a>：错误模型全部被检出，含第二轮评审使用的同一 M1 变异（§3.1）</td>
+</tr>
+</tbody></table>
+<p><strong>第三轮复核（针对第 3 版）</strong>：结论为 <code>flaws-remain</code>——<strong>无 critical、无假定理</strong>，T3/A9 修复与哈希一致性被确认；但发现 1 major + 5 minor 的覆盖/自比较残留。逐条处置：</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>第 3 版问题</th>
+<th>处置（第 4 版）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C26</td>
+<td><strong>major</strong>：自环&quot;被拒&quot;其实是<strong>类型规则</strong>拒绝的，无环规则对自环未受检（DFS 对自环失明仍全绿）</td>
+<td>节点 <code>n4</code> 改为 <code>out === in</code>，使自环只能因成环被拒；枚举扩到含 4 条自环的 16 条有序对（$2^{16}$）；新增变异体 M7（DFS 对自环失明）并被检出</td>
+</tr>
+<tr>
+<td>C27</td>
+<td>残留 <code>impl.valid === def.valid</code> 自比较（<code>graphValid</code> 委托 <code>validByDefinition</code>）</td>
+<td>删除该比较，只保留两种独立实现的<strong>环判定</strong>比较；谓词合法性交由实现 B（规格字符串表）比较</td>
+</tr>
+<tr>
+<td>C28</td>
+<td><code>!acyclic ⇒ order.length &lt; n</code> 由 <code>acyclic</code> 的定义直接蕴含（C17 残渣）</td>
+<td>删除该断言；覆盖性由独立 DFS 访问计数承担</td>
+</tr>
+<tr>
+<td>C29</td>
+<td>重载 R 的集合语义未被真正检验（调用点已去重）</td>
+<td><code>complete</code> 内部按集合去重，并以<strong>重复 id 入参</strong>直接检验该语义</td>
+</tr>
+<tr>
+<td>C30</td>
+<td><code>complete</code> 的长度守卫与成员守卫各自单独移除都能全绿</td>
+<td>新增&quot;多出外来条目&quot;与&quot;外来 id 顶替必需 id&quot;两个反例，并加入变异体 M9</td>
+</tr>
+<tr>
+<td>C31</td>
+<td><code>runPure</code> 的入边排序属确定性却不被检验；另有一条幂等断言被误列为有齿</td>
+<td>新增&quot;入边列举顺序无关&quot;检验与变异体 M8；幂等断言改标 <code>演示</code></td>
+</tr>
+</tbody></table>
+<p><strong>第四轮复核（针对第 4 版）</strong>：结论 <code>flaws-remain</code>——<strong>无 critical、无假定理</strong>，自环覆盖与既往自比较修复全部被确认；剩余 1 major + 2 minor + 2 nit，均为&quot;证据级声明&quot;与版本信封问题：</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>上版问题</th>
+<th>处置（第 5 版）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C32</td>
+<td><strong>major</strong>：<code>if (acyclic) assert(dfs.visited === IDS.length)</code> 是构造性同义反复（无环时 <code>visited</code> 恒等于节点数），文档却称&quot;节点覆盖数由独立 DFS 交叉核对&quot;</td>
+<td>删除该断言（并在脚本内注释说明为何删除）；文档同步删除&quot;节点覆盖数交叉核对&quot;措辞，改述为&quot;环判定一致&quot;这一真正有齿的比较</td>
+</tr>
+<tr>
+<td>C33</td>
+<td>文档同一节内变异体计数不一致（&quot;6 个方向&quot; vs 实际 9 个）</td>
+<td>统一为 9</td>
+</tr>
+<tr>
+<td>C34</td>
+<td>版本信封仍写&quot;第 2 版&quot;、附录 C 标题写&quot;1 → 2 版&quot;，与后文&quot;第 5 版&quot;处置矛盾</td>
+<td>状态改为&quot;第 5 版（四轮评审）&quot;，附录 C 标题改为&quot;第 1 版 → 第 5 版&quot;</td>
+</tr>
+<tr>
+<td>C35</td>
+<td>C17 行记录的&quot;对含环图断言 Kahn 覆盖不全&quot;已被 C28 删除，未标注</td>
+<td>C17 行补注&quot;该覆盖数断言随后被判定为空真并删除&quot;</td>
+</tr>
+<tr>
+<td>C36</td>
+<td><code>assert(combos.length === 6)</code> 是枚举器自检，无用例可失败</td>
+<td>删除该断言（枚举正确性由&quot;每个组合映射入四态&quot;的循环断言承担）</td>
+</tr>
+</tbody></table>
+
+<p class="note">图表为 Mermaid 源码，联网时自动渲染为图形；离线时保留可复制源码。</p>
+</main>
+<script type="module">
+(async () => {
+  const blocks = [...document.querySelectorAll('pre.mermaid-block code.language-mermaid')];
+  if (!blocks.length) return;
+  try {
+    const m = await import('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs');
+    m.default.initialize({ startOnLoad:false, theme: 'default' });
+    await m.default.run({ nodes: blocks.map(b => b.parentElement) });
+  } catch (e) {
+    console.warn('mermaid render skipped (offline/blocked)', e);
+  }
+})();
+</script>
+</body>
+</html>
