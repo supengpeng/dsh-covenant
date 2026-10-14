@@ -1,6 +1,7 @@
 import type { Verdict, VerdictRecord } from '@dsh-covenant/assertion'
 import { canon } from './canon.js'
 import { signRoot, sha256Hex, verifyRoot, type Hash } from './crypto.js'
+import { renderFace } from './faces.js'
 
 /**
  * 证据链（theory-proof.md 定义 3.1 / development.md §5.2 / architecture.md §11）。
@@ -109,6 +110,11 @@ export class EvidenceChain {
     const counts: BucketCounts = { pass: 0, fail: 0, skip: 0, error: 0, inconclusive: 0 }
     for (const e of this.entries) counts[e.payload.verdict] += 1
     return counts
+  }
+
+  /** 真相面孔（纯函数，由权威链派生，禁止反写；§5.2 / §15.3 单向性）。 */
+  render(face: Face): string {
+    return renderFace(this, face)
   }
 }
 

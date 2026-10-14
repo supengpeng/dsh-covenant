@@ -1,3 +1,13 @@
-// 占位模块（Task 7/8 实现；见 development.md 与 tasks/todo.md）。
-// 无操作导出，待后续任务按 §5 模块规格填充。
-export {}
+export * from './graph.js'
+export {
+  buildPlan,
+  InvalidGraphError,
+  Orchestrator,
+  planDigest,
+  type ExecutionPlan,
+  type NodeAssertion,
+  type NodeBehavior,
+  type PlannedNode,
+  type RunResult,
+  type RunSpec,
+} from './scheduler.js'

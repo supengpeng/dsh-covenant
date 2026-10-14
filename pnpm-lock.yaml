@@ -42,7 +42,17 @@ importers:
 
   packages/host-adapter: {}
 
-  packages/orchestrator-core: {}
+  packages/orchestrator-core:
+    dependencies:
+      '@dsh-covenant/assertion':
+        specifier: workspace:*
+        version: link:../assertion
+      '@dsh-covenant/evidence-model':
+        specifier: workspace:*
+        version: link:../evidence-model
+      '@dsh-covenant/host-adapter':
+        specifier: workspace:*
+        version: link:../host-adapter
 
   packages/suggester-human: {}
 
