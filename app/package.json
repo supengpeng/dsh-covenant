@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "根插件：用 ctx.plugin 组装 9 个子插件（对外单插件、对内多子插件，各自独立 fiber 生命周期）",
+  "description": "根插件：用 ctx.plugin 组装 9 个子插件（对外单插件、对内多子插件，各自独立 fiber 生命周期与服务注册）",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "exports": {
@@ -14,6 +14,15 @@
   },
   "files": ["src"],
   "dependencies": {
-    "@deepseek-ai/cordis": "4.0.4"
+    "@deepseek-ai/cordis": "4.0.4",
+    "@dsh-covenant/assertion": "workspace:*",
+    "@dsh-covenant/capability-probe": "workspace:*",
+    "@dsh-covenant/dual-entry": "workspace:*",
+    "@dsh-covenant/evidence-model": "workspace:*",
+    "@dsh-covenant/host-adapter": "workspace:*",
+    "@dsh-covenant/orchestrator-core": "workspace:*",
+    "@dsh-covenant/suggester-human": "workspace:*",
+    "@dsh-covenant/tool-spec": "workspace:*",
+    "@dsh-covenant/worker-host-runtime": "workspace:*"
   }
 }
