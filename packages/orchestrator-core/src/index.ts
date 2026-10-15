@@ -18,8 +18,14 @@ export {
   perturb,
   samplesForCycle,
   verifyCycle,
+  parseExternalSamples,
+  readExternalSamplesFile,
+  AdversarialCronRunner,
   type AdversarialCategory,
   type AdversarialSample,
   type BaseSample,
   type CycleVerdict,
+  type ExternalSampleSet,
+  type AdversarialCronRunnerOptions,
 } from './adversarial.js'
+export { cronMatches, nextRunAfter } from './cron.js'

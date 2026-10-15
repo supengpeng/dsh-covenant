@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "version": "external:v2",
+  "samples": [
+    { "id": "iso:v2:1", "category": "isolation-escape", "source": "external:v2", "payload": { "sharedFile": "/var/data", "sharedPort": 9090, "sharedCache": "ck2" } },
+    { "id": "forge:v2:1", "category": "forge-evidence", "source": "external:v2", "payload": { "forgedVerdict": "pass", "noise": "v2 forged evidence" } },
+    { "id": "priv:v2:1", "category": "privilege-escalation", "source": "external:v2", "payload": { "vmTier": true, "requireSecurityIsolation": true } },
+    { "id": "viol:v2:1", "category": "violating-plugin", "source": "external:v2", "payload": { "violatesContract": true, "message": "v2 violating plugin" } }
+  ]
+}

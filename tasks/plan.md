@@ -84,5 +84,5 @@
 
 1. 是否把 `development.md` 纳入 `theory-envelope-check.mjs` 的 §引用校验。
 2. ~~容器/远端档~~ → **四档隔离全部落地**：vm / 子进程 / 容器（真实 docker）/ 远端（真实 ssh）均已实现并真实验证；**无遗留后续档**（远端 `requireSecurityIsolation` 的安全隔离主张以真实独立远端主机为准，`localhost` 仅协议传输自测）。
-3. 对抗集新变种周期：已实现（`packages/orchestrator-core/src/adversarial.ts` + `tests/adversarial/cycle.spec.ts`）。**默认口径（待确认）**：周期=机检可重放（确定性 `cycle`，非时间 cron）；样本来源=内置 `builtin:v1` 基础样本 + 确定性等价变形；验收=各周期变种 100% 检出、漏检即 FAIL（F17）。
+3. 对抗集新变种周期：已实现，**口径已确认**——周期触发=**真实时间 cron** 调度（`AdversarialCronRunner`）；样本来源=**外部样本供给**（本地目录 + JSON manifest，`parseExternalSamples`/`readExternalSamplesFile`；未知类别/空样本集/解析失败均 FAIL）。确定性变种展开（`perturb`/`samplesForCycle`）保留为**离线演练入口**。验收=各 cron 触发点引入样本 100% 检出、漏检即 FAIL（F17）。
 4. 工作文件（`gen_html.mjs` / `.archify` / `.review-findings-*`）入库或 `.gitignore`。

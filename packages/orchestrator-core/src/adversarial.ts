@@ -1,15 +1,19 @@
 /**
- * 对抗集新变种周期（architecture.md §15.7 F17；development.md §11.3 待定口径）。
+ * 对抗集新变种周期（architecture.md §15.7 F17）。
  *
- * 口径（**默认值，待用户确认**）：
- *  - 周期触发 = **机检可重放**（确定性 `cycle` 参数），非真实时间 cron；
- *  - 样本来源 = **内置基础样本（`builtin:v1`）+ 确定性变种展开**：同一基础样本
- *    按 `(cycle, seed)` 做等价变形（键序扰动 / 字符串叶加噪 / 数组轮转），产出一组新变种；
- *  - 验收 = 各周期全部变种 100% 检出，漏检即 FAIL（F17）；并保证新变种真实进入
- *    （payload 随周期变化）且可重放（同 cycle+seed 字节一致）。
+ * 口径（**已确认**）：
+ *  - 周期触发 = **真实时间 cron**（进程内调度器按 cron 表达式推进，见 `AdversarialCronRunner`）；
+ *  - 样本来源 = **外部样本供给**（本地目录 + JSON manifest，见 `parseExternalSamples` /
+ *    `readExternalSamplesFile`）；外部样本须带 `schemaVersion/category/source/payload`，未知类别、
+ *    解析失败、空样本集均按 FAIL 处理（不静默缩水）；
+ *  - 验收 = 每个 cron 触发点引入的样本 100% 检出，漏检即 FAIL（F17）。
  *
- * 本模块是**纯函数**周期机制，不依赖任何后端；检测器由调用方注入。
+ * 下方 `perturb`/`samplesForCycle` 保留为**离线演练/确定性变种入口**（不依赖外部供给时可用），
+ * 但正式周期入口是 cron + 外部样本。检测器由调用方注入（与后端解耦）。
  */
+
+import { nextRunAfter } from './cron.js'
+import { readFileSync } from 'node:fs'
 
 export type AdversarialCategory =
   | 'violating-plugin'
@@ -136,4 +140,115 @@ export function verifyCycle(
     else missed.push(s.id)
   }
   return { cycle: samples[0]?.cycle ?? 0, total: samples.length, detected, missed }
+}
+
+// ---------------------------------------------------------------------------
+// 外部样本供给（本地目录 + JSON manifest）
+// ---------------------------------------------------------------------------
+
+const CATEGORIES: readonly string[] = [
+  'violating-plugin',
+  'forge-evidence',
+  'privilege-escalation',
+  'isolation-escape',
+]
+
+export interface ExternalSampleSet {
+  readonly schemaVersion: number
+  readonly version: string
+  readonly samples: readonly AdversarialSample[]
+}
+
+function isCategory(v: unknown): v is AdversarialCategory {
+  return typeof v === 'string' && CATEGORIES.includes(v)
+}
+
+/**
+ * 解析外部样本 JSON manifest。未知类别 / 缺失字段 / 空样本集一律抛错（不能静默缩水）。
+ *
+ * 期待格式：
+ * ```json
+ * { "schemaVersion": 1, "version": "v1", "samples": [
+ *     { "id": "forge-evidence:001", "category": "forge-evidence", "source": "external:v1", "payload": {...} }
+ * ] }
+ * ```
+ */
+export function parseExternalSamples(text: string): ExternalSampleSet {
+  let data: unknown
+  try {
+    data = JSON.parse(text)
+  } catch (err) {
+    throw new Error(`external samples manifest is not valid JSON: ${String(err)}`)
+  }
+  const root = data as { schemaVersion?: unknown; version?: unknown; samples?: unknown }
+  if (root.schemaVersion !== 1) throw new Error('external samples manifest: schemaVersion must be 1')
+  if (typeof root.version !== 'string' || !root.version.trim()) throw new Error('external samples manifest: version must be a non-empty string')
+  if (!Array.isArray(root.samples)) throw new Error('external samples manifest: samples must be an array')
+  if (root.samples.length === 0) throw new Error('external samples manifest: samples must not be empty (empty set = FAIL)')
+
+  const samples: AdversarialSample[] = root.samples.map((s, i) => {
+    const o = s as { id?: unknown; category?: unknown; source?: unknown; payload?: unknown }
+    if (typeof o.id !== 'string' || !o.id.trim()) throw new Error(`samples[${i}]: id must be a non-empty string`)
+    if (!isCategory(o.category)) throw new Error(`samples[${i}] (${o.id}): unknown category ${JSON.stringify(o.category)}`)
+    return {
+      id: o.id,
+      category: o.category,
+      cycle: 0, // 外部样本无内部 cycle；由 scheduler 注入 cycleIndex
+      variantIndex: i,
+      source: typeof o.source === 'string' ? o.source : `external:${root.version}`,
+      payload: o.payload,
+    }
+  })
+  return { schemaVersion: 1, version: root.version, samples }
+}
+
+/** 读本地外部样本 manifest 文件（node:fs）。 */
+export function readExternalSamplesFile(path: string): ExternalSampleSet {
+  return parseExternalSamples(readFileSync(path, 'utf8'))
+}
+
+// ---------------------------------------------------------------------------
+// 真实时间 cron 调度
+// ---------------------------------------------------------------------------
+
+export interface AdversarialCronRunnerOptions {
+  readonly cron: string
+  readonly clock?: () => Date
+  /** 每个到期的 cron 触发点调用一次（cycleIndex 自 0 递增），返回该周期要检出的外部样本。 */
+  readonly supplier: (cycleIndex: number) => Promise<readonly AdversarialSample[]> | readonly AdversarialSample[]
+  readonly detect: (sample: AdversarialSample) => boolean
+  /** 调度基线（默认 = clock() 或 now）。 */
+  readonly startFrom?: Date
+}
+
+/**
+ * 对抗集 cron 调度器：按真实时间 cron 推进；每到一个触发点，从外部供给引一个样本集
+ * 并跑 `verifyCycle`（100% 检出，漏检即 FAIL）。用注入 clock 保证测试可无抖动推进。
+ */
+export class AdversarialCronRunner {
+  private cursor: Date
+  private cycleIndex = 0
+
+  constructor(private readonly opts: AdversarialCronRunnerOptions) {
+    this.cursor = opts.startFrom ?? opts.clock?.() ?? new Date()
+  }
+
+  /** 推进到 `now`：对每个已到期的 cron 触发点，引入外部样本集并跑一轮。 */
+  async run(now?: Date): Promise<CycleVerdict[]> {
+    const t = now ?? this.opts.clock?.() ?? new Date()
+    const results: CycleVerdict[] = []
+    let next = nextRunAfter(this.opts.cron, this.cursor)
+    while (next && next.getTime() <= t.getTime()) {
+      const samples = await this.opts.supplier(this.cycleIndex)
+      if (samples.length === 0) {
+        throw new Error(`adversarial cycle ${this.cycleIndex} supplied an empty sample set — FAIL (no samples)`)
+      }
+      results.push(verifyCycle(samples, this.opts.detect))
+      this.cycleIndex += 1
+      this.cursor = next
+      next = nextRunAfter(this.opts.cron, this.cursor)
+    }
+    this.cursor = t
+    return results
+  }
 }
