@@ -4,3 +4,12 @@ dist/
 *.tsbuildinfo
 .turbo/
 coverage/
+
+# 日志（运行时产物，不提交）
+*.log
+
+# 本地工作/生成文件（tasks/plan.md Q4：当前保持不入库）
+.archify/
+.review-findings*.md
+gen_html.mjs
+serve.py
