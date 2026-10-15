@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "DSH Plugin Test Platform",
+    "description": "Meta-plugin that validates other DSH plugins: capability probing, verdict judgment, evidence chain, and four isolation tiers (vm / subprocess / container / remote)."
+  }
+}

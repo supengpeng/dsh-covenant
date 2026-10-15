@@ -1,0 +1,4 @@
+- insert:
+    - id: dsh-covenant
+      name: '@local/dsh-covenant'
+      config: {}

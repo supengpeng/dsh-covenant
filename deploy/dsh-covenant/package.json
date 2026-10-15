@@ -1,0 +1,18 @@
+{
+  "name": "@local/dsh-covenant",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DSH 插件测试平台（元插件）：能力探测、判定、证据链、四档隔离，用于验证其它 DSH 插件",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": ["index.js", "cordis.patch.yml", "locale/*.json", "icon.svg"],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

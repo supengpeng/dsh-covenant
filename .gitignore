@@ -13,3 +13,6 @@ coverage/
 .review-findings*.md
 gen_html.mjs
 serve.py
+
+# 安装 bundle 的构建产物（esbuild 打包，可经 deploy/README.md 重建）
+deploy/dsh-covenant/index.js
